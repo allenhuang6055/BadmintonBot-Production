@@ -1,0 +1,16 @@
+{
+  "name": "badmintonbot-v10-1-date-stock-fix",
+  "version": "10.1.0",
+  "description": "健好羽球 LINE Bot V10.1 補單日期與庫存修正版",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "@line/bot-sdk": "^10.2.0",
+    "dotenv": "^17.0.0",
+    "express": "^5.1.0",
+    "googleapis": "^150.0.1",
+    "node-cron": "^3.0.3"
+  }
+}
