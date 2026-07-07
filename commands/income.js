@@ -12,9 +12,35 @@ function money(value) {
   return Number(value || 0).toLocaleString("zh-TW");
 }
 
+function isMonWedFri(day) {
+  return [1, 3, 5].includes(day);
+}
+
+function isTueThu(day) {
+  return [2, 4].includes(day);
+}
+
+function filterIncomeTemplateItems(items) {
+  const day = new Date().getDay();
+
+  return items.filter((item) => {
+    if (item.includes("一三五")) {
+      return isMonWedFri(day);
+    }
+
+    if (item.includes("二四")) {
+      return isTueThu(day);
+    }
+
+    return true;
+  });
+}
+
 async function incomeTemplate() {
   const items = await getEnabledItems("收入");
-  const body = items.map((item) => `${item}：0`).join("\n");
+  const displayItems = filterIncomeTemplateItems(items);
+
+  const body = displayItems.map((item) => `${item}：0`).join("\n");
   const stock = await getCurrentStock();
 
   return `💰 收入＋耗球
@@ -47,17 +73,30 @@ async function handleIncome(text, user) {
   }
 
   const ballsUsed = Number(parsed.result["耗球"] || 0);
-  if (ballsUsed > 0) records.push({ type: "庫存", item: "耗球", ballsUsed, note, date: recordDate });
+  if (ballsUsed > 0) {
+    records.push({
+      type: "庫存",
+      item: "耗球",
+      ballsUsed,
+      note,
+      date: recordDate,
+    });
+  }
 
-  console.log("PARSE_INCOME_RESULT:", JSON.stringify({
-    user: user.name,
-    text,
-    parsed: parsed.matched,
-    unknown: parsed.unknown,
-    result: parsed.result,
-  }));
+  console.log(
+    "PARSE_INCOME_RESULT:",
+    JSON.stringify({
+      user: user.name,
+      text,
+      parsed: parsed.matched,
+      unknown: parsed.unknown,
+      result: parsed.result,
+    })
+  );
 
-  if (!records.length) throw new Error("沒有讀到收入金額或耗球數。");
+  if (!records.length) {
+    throw new Error("沒有讀到收入金額或耗球數。");
+  }
 
   await appendRecords(records, user);
 
@@ -66,12 +105,13 @@ async function handleIncome(text, user) {
   const my = await getSummary("month", user.id);
 
   const title = incomeTotal > 0 ? "✅ 收入完成" : "✅ 耗球記錄完成";
-  const incomeBlock = incomeTotal > 0
-    ? `收入明細：
+  const incomeBlock =
+    incomeTotal > 0
+      ? `收入明細：
 ${incomeLines.join("\n")}
 
 收入合計：${money(incomeTotal)} 元`
-    : "收入合計：0 元";
+      : "收入合計：0 元";
 
   return `${title}
 
