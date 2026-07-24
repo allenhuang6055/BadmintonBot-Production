@@ -33,7 +33,7 @@ ${body}
 💡價格提示
 零打：200元
 暢打：男150元／女100元
-球券：800元／本;
+球券：800元／本`;
 }
 
 async function handleIncome(text, user) {
