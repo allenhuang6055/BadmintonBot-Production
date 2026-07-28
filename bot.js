@@ -5,14 +5,12 @@ const line = require("@line/bot-sdk");
 
 const { mainMenuMessage } = require("./config/menu");
 const { getUser } = require("./services/lineUser");
-
 const {
   pushGroupMessage,
   buildGroupNotice,
   groupConfigText,
   hasGroupId,
 } = require("./services/groupNotify");
-
 const {
   setSession,
   getSession,
@@ -20,21 +18,9 @@ const {
   sessionName,
 } = require("./services/sessionStore");
 
-const {
-  incomeTemplate,
-  handleIncome,
-} = require("./commands/income");
-
-const {
-  expenseTemplate,
-  handleExpense,
-} = require("./commands/expense");
-
-const {
-  paymentTemplate,
-  handlePayment,
-} = require("./commands/payment");
-
+const { incomeTemplate, handleIncome } = require("./commands/income");
+const { expenseTemplate, handleExpense } = require("./commands/expense");
+const { paymentTemplate, handlePayment } = require("./commands/payment");
 const {
   handleToday,
   handleMonth,
@@ -52,7 +38,6 @@ try {
     "SCHEDULED_REPORT_LOAD_FAILED:",
     err?.message || err
   );
-
   startDailyReport = null;
 }
 
@@ -67,395 +52,72 @@ const client = new line.messagingApi.MessagingApiClient({
   channelAccessToken: config.channelAccessToken,
 });
 
-/*
- * 暫存近期收到的 webhookEventId。
- * 用來判斷同一個事件是否被 LINE 重送。
- *
- * 注意：
- * Render 重新啟動後，這份記錄會清空，
- * 這是正常現象。
- */
-const recentWebhookEvents = new Map();
-
-const WEBHOOK_EVENT_KEEP_MS = 10 * 60 * 1000;
-
-function cleanupWebhookEvents() {
-  const now = Date.now();
-
-  for (const [eventId, receivedAt] of recentWebhookEvents.entries()) {
-    if (now - receivedAt > WEBHOOK_EVENT_KEEP_MS) {
-      recentWebhookEvents.delete(eventId);
-    }
-  }
-}
-
-function maskValue(value, visibleLength = 6) {
-  const text = String(value || "");
-
-  if (!text) {
-    return "(empty)";
-  }
-
-  if (text.length <= visibleLength * 2) {
-    return text;
-  }
-
-  return `${text.slice(0, visibleLength)}...${text.slice(
-    -visibleLength
-  )}`;
-}
-
-function safeJson(value) {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch (err) {
-    return String(value);
-  }
-}
-
-function getErrorStatus(err) {
-  return (
-    err?.status ||
-    err?.statusCode ||
-    err?.response?.status ||
-    err?.response?.statusCode ||
-    ""
-  );
-}
-
-function getErrorHeaders(err) {
-  return (
-    err?.response?.headers ||
-    err?.headers ||
-    err?.originalError?.response?.headers ||
-    null
-  );
-}
-
-function getErrorBody(err) {
-  return (
-    err?.response?.data ||
-    err?.body ||
-    err?.responseBody ||
-    err?.originalError?.response?.data ||
-    null
-  );
-}
-
-function getRetryAfter(headers) {
-  if (!headers) {
-    return "";
-  }
-
-  return (
-    headers["retry-after"] ||
-    headers["Retry-After"] ||
-    headers.get?.("retry-after") ||
-    ""
-  );
-}
-
-function logLineError(label, err) {
-  const status = getErrorStatus(err);
-  const headers = getErrorHeaders(err);
-  const body = getErrorBody(err);
-  const retryAfter = getRetryAfter(headers);
-
-  console.error("");
-  console.error("========================================");
-  console.error(label);
-  console.error("========================================");
-  console.error("Status       :", status || "(unknown)");
-  console.error(
-    "Message      :",
-    err?.message || String(err)
-  );
-  console.error(
-    "Retry-After  :",
-    retryAfter || "(not provided)"
-  );
-  console.error("Headers      :", safeJson(headers));
-  console.error("Response Body:", safeJson(body));
-  console.error(
-    "Stack        :",
-    err?.stack || "(no stack)"
-  );
-  console.error("========================================");
-  console.error("");
-}
-
-function logEventStart(event) {
-  cleanupWebhookEvents();
-
-  const eventId = event?.webhookEventId || "";
-  const firstReceivedAt = recentWebhookEvents.get(eventId);
-  const isDuplicate =
-    Boolean(eventId) && Boolean(firstReceivedAt);
-
-  if (eventId && !firstReceivedAt) {
-    recentWebhookEvents.set(eventId, Date.now());
-  }
-
-  console.log("");
-  console.log("================================================");
-  console.log("EVENT START");
-  console.log("================================================");
-  console.log(
-    "WebhookEventId :",
-    eventId || "(not provided)"
-  );
-  console.log(
-    "Duplicate      :",
-    isDuplicate ? "YES" : "NO"
-  );
-  console.log(
-    "Delivery Mode  :",
-    event?.deliveryContext?.isRedelivery
-      ? "REDELIVERY"
-      : "NORMAL"
-  );
-  console.log(
-    "ReplyToken     :",
-    maskValue(event?.replyToken)
-  );
-  console.log(
-    "Timestamp      :",
-    event?.timestamp || ""
-  );
-  console.log(
-    "Event Type     :",
-    event?.type || ""
-  );
-  console.log(
-    "Message Type   :",
-    event?.message?.type || ""
-  );
-  console.log(
-    "Text           :",
-    event?.message?.text || ""
-  );
-  console.log(
-    "Source Type    :",
-    event?.source?.type || ""
-  );
-  console.log(
-    "UserId         :",
-    maskValue(event?.source?.userId)
-  );
-  console.log(
-    "GroupId        :",
-    maskValue(event?.source?.groupId)
-  );
-  console.log(
-    "RoomId         :",
-    maskValue(event?.source?.roomId)
-  );
-  console.log("================================================");
-
-  return {
-    eventId,
-    isDuplicate,
-  };
-}
-
 app.get("/", (req, res) => {
-  res.send("BadmintonBot V10.1 Debug is running");
+  res.send("BadmintonBot V10 session stable is running");
 });
 
-app.post(
-  "/webhook",
-  line.middleware(config),
-  async (req, res) => {
-    const webhookStart = Date.now();
-
-    console.log("");
-    console.log("################################################");
-    console.log("WEBHOOK REQUEST START");
-    console.log(
-      "Event Count:",
-      Array.isArray(req.body?.events)
-        ? req.body.events.length
-        : 0
-    );
-    console.log("################################################");
-
-    try {
-      await Promise.all(
-        (req.body?.events || []).map(handleEvent)
-      );
-
-      console.log(
-        "WEBHOOK REQUEST SUCCESS:",
-        `${Date.now() - webhookStart} ms`
-      );
-
-      res.status(200).end();
-    } catch (err) {
-      logLineError("WEBHOOK REQUEST FAILED", err);
-
-      res.status(500).end();
-    }
-  }
-);
-
-async function replyText(replyToken, text) {
-  const start = Date.now();
-
-  console.log("");
-  console.log("REPLY START");
-  console.log(
-    "ReplyToken:",
-    maskValue(replyToken)
-  );
-  console.log(
-    "Text Preview:",
-    String(text || "").slice(0, 150)
-  );
-
+app.post("/webhook", line.middleware(config), async (req, res) => {
   try {
-    const result = await client.replyMessage({
-      replyToken,
-      messages: [
-        {
-          type: "text",
-          text,
-        },
-      ],
-    });
-
-    console.log(
-      "REPLY SUCCESS:",
-      `${Date.now() - start} ms`
-    );
-
-    return result;
+    await Promise.all(req.body.events.map(handleEvent));
+    res.status(200).end();
   } catch (err) {
     console.error(
-      "REPLY FAILED AFTER:",
-      `${Date.now() - start} ms`
+      "WEBHOOK_FAILED:",
+      err?.response?.data || err?.message || err
     );
 
-    logLineError("REPLY MESSAGE FAILED", err);
-
-    throw err;
+    res.status(500).end();
   }
+});
+
+async function replyText(replyToken, text) {
+  return client.replyMessage({
+    replyToken,
+    messages: [
+      {
+        type: "text",
+        text,
+      },
+    ],
+  });
 }
 
 async function replyMessages(replyToken, messages) {
-  const start = Date.now();
-
-  console.log("");
-  console.log("REPLY MULTIPLE START");
-  console.log(
-    "ReplyToken:",
-    maskValue(replyToken)
-  );
-  console.log(
-    "Message Count:",
-    Array.isArray(messages)
-      ? messages.length
-      : 0
-  );
-
-  try {
-    const result = await client.replyMessage({
-      replyToken,
-      messages,
-    });
-
-    console.log(
-      "REPLY MULTIPLE SUCCESS:",
-      `${Date.now() - start} ms`
-    );
-
-    return result;
-  } catch (err) {
-    console.error(
-      "REPLY MULTIPLE FAILED AFTER:",
-      `${Date.now() - start} ms`
-    );
-
-    logLineError(
-      "REPLY MULTIPLE MESSAGE FAILED",
-      err
-    );
-
-    throw err;
-  }
+  return client.replyMessage({
+    replyToken,
+    messages,
+  });
 }
 
-async function notifyGroupSafely(
-  kind,
-  user,
-  resultText,
-  event
-) {
-  const start = Date.now();
-
-  console.log("");
-  console.log("GROUP_NOTIFY_START");
-  console.log("Kind       :", kind);
-  console.log(
-    "User       :",
-    user?.name || "(unknown)"
-  );
-  console.log(
-    "Source Type:",
-    event?.source?.type || ""
-  );
-  console.log(
-    "Event ID   :",
-    event?.webhookEventId || ""
-  );
-
+async function notifyGroupSafely(kind, user, resultText, event) {
   try {
     if (event?.source?.type === "group") {
       console.log(
         "GROUP_NOTIFY_SKIPPED: source is group, reply only"
       );
-
-      return false;
+      return;
     }
 
-    if (!hasGroupId()) {
-      console.log(
-        "GROUP_NOTIFY_SKIPPED: LINE_GROUP_ID is empty"
-      );
-
-      return false;
-    }
-
-    const notice = buildGroupNotice(
-      kind,
-      user,
-      resultText
-    );
-
-    console.log(
-      "Notice Preview:",
-      notice.slice(0, 200)
-    );
+    const notice = buildGroupNotice(kind, user, resultText);
 
     await pushGroupMessage(client, notice);
 
-    console.log(
-      "GROUP_NOTIFY_SUCCESS:",
-      `${Date.now() - start} ms`
-    );
-
-    return true;
+    console.log("GROUP_NOTIFY_SUCCESS:", kind);
   } catch (err) {
+    const status =
+      err?.status ||
+      err?.statusCode ||
+      err?.response?.status ||
+      "";
+
+    const message =
+      err?.response?.data?.message ||
+      err?.message ||
+      String(err);
+
     console.error(
-      "GROUP_NOTIFY_FAILED AFTER:",
-      `${Date.now() - start} ms`
+      `GROUP_NOTIFY_FAILED:${status ? ` ${status} -` : ""} ${message}`
     );
-
-    logLineError(
-      "GROUP NOTIFY FAILED",
-      err
-    );
-
-    return false;
   }
 }
 
@@ -466,34 +128,20 @@ function incomeNoticeKind(resultText) {
 }
 
 async function startMode(event, mode) {
-  console.log("");
-  console.log("START_MODE:", mode);
-
   setSession(event, mode);
 
   if (mode === "income") {
     const template = await incomeTemplate();
-
-    return replyText(
-      event.replyToken,
-      template
-    );
+    return replyText(event.replyToken, template);
   }
 
   if (mode === "expense") {
     const template = await expenseTemplate();
-
-    return replyText(
-      event.replyToken,
-      template
-    );
+    return replyText(event.replyToken, template);
   }
 
   if (mode === "payment") {
-    return replyText(
-      event.replyToken,
-      paymentTemplate()
-    );
+    return replyText(event.replyToken, paymentTemplate());
   }
 
   clearSession(event);
@@ -514,20 +162,8 @@ function isCancel(text) {
   ].includes(text);
 }
 
-async function handleSessionInput(
-  event,
-  text,
-  user
-) {
+async function handleSessionInput(event, text, user) {
   const session = getSession(event);
-
-  console.log("");
-  console.log(
-    "SESSION CHECK:",
-    session
-      ? session.mode
-      : "(no session)"
-  );
 
   if (!session) {
     return false;
@@ -538,176 +174,71 @@ async function handleSessionInput(
 
     await replyText(
       event.replyToken,
-      `已取消「${sessionName(
-        session.mode
-      )}」操作。`
+      `已取消「${sessionName(session.mode)}」操作。`
     );
 
     return true;
   }
 
-  const processStart = Date.now();
-
   let resultText = "";
   let kind = "";
 
-  console.log(
-    "SESSION PROCESS START:",
-    session.mode
-  );
-
   if (session.mode === "income") {
-    const incomeStart = Date.now();
-
-    console.log("HANDLE_INCOME_START");
-
-    resultText = await handleIncome(
-      text,
-      user
-    );
-
-    console.log(
-      "HANDLE_INCOME_SUCCESS:",
-      `${Date.now() - incomeStart} ms`
-    );
-
+    resultText = await handleIncome(text, user);
     kind = incomeNoticeKind(resultText);
   } else if (session.mode === "expense") {
-    const expenseStart = Date.now();
-
-    console.log("HANDLE_EXPENSE_START");
-
-    resultText = await handleExpense(
-      text,
-      user
-    );
-
-    console.log(
-      "HANDLE_EXPENSE_SUCCESS:",
-      `${Date.now() - expenseStart} ms`
-    );
-
+    resultText = await handleExpense(text, user);
     kind = "expense";
   } else if (session.mode === "payment") {
-    const paymentStart = Date.now();
-
-    console.log("HANDLE_PAYMENT_START");
-
-    resultText = await handlePayment(
-      text,
-      user
-    );
-
-    console.log(
-      "HANDLE_PAYMENT_SUCCESS:",
-      `${Date.now() - paymentStart} ms`
-    );
-
+    resultText = await handlePayment(text, user);
     kind = "payment";
   } else {
     clearSession(event);
-
-    console.log(
-      "SESSION MODE UNKNOWN:",
-      session.mode
-    );
-
     return false;
   }
 
   clearSession(event);
 
-  console.log(
-    "SESSION CLEARED:",
-    session.mode
-  );
+  /*
+   * 重要：
+   * 先使用 replyToken 回覆操作人。
+   * 群組通知就算遇到 429 或其他錯誤，
+   * 也不會影響操作人收到成功訊息。
+   */
+  await replyText(event.replyToken, resultText);
 
   /*
-   * 先回覆操作人。
-   * 群組通知即使失敗，也不能影響這個回覆。
+   * 群組通知改成非阻塞執行。
+   * 不使用 await，避免群組推播延遲或失敗，
+   * 影響 webhook 的主要回覆。
    */
-  await replyText(
-    event.replyToken,
-    resultText
-  );
-
-  /*
-   * 群組通知採背景執行。
-   * 不使用 await，不阻塞主要 webhook。
-   */
-  console.log(
-    "GROUP_NOTIFY_BACKGROUND_QUEUED"
-  );
-
   void notifyGroupSafely(
     kind,
     user,
     resultText,
     event
   ).catch((err) => {
-    logLineError(
-      "GROUP NOTIFY BACKGROUND UNEXPECTED FAILED",
-      err
+    console.error(
+      "GROUP_NOTIFY_BACKGROUND_FAILED:",
+      err?.message || err
     );
   });
-
-  console.log(
-    "SESSION PROCESS SUCCESS:",
-    `${Date.now() - processStart} ms`
-  );
 
   return true;
 }
 
 async function handleEvent(event) {
-  const eventStart = Date.now();
+  if (
+    event.type !== "message" ||
+    event.message.type !== "text"
+  ) {
+    return;
+  }
 
-  const {
-    eventId,
-    isDuplicate,
-  } = logEventStart(event);
+  const text = event.message.text.trim();
+  const user = await getUser(client, event);
 
   try {
-    if (
-      event.type !== "message" ||
-      event.message?.type !== "text"
-    ) {
-      console.log(
-        "EVENT SKIPPED: not a text message"
-      );
-
-      return;
-    }
-
-    /*
-     * 只記錄是否重複，目前不直接略過。
-     * 先觀察 Log，確認 LINE 是否真的重送。
-     */
-    if (isDuplicate) {
-      console.warn(
-        "WARNING: DUPLICATE WEBHOOK EVENT DETECTED:",
-        eventId
-      );
-    }
-
-    const text =
-      event.message.text.trim();
-
-    const userStart = Date.now();
-
-    console.log("GET_USER_START");
-
-    const user = await getUser(
-      client,
-      event
-    );
-
-    console.log(
-      "GET_USER_SUCCESS:",
-      `${Date.now() - userStart} ms`,
-      user?.name || "(unknown)"
-    );
-
     if (
       text === "群組ID" ||
       text.toLowerCase() === "groupid"
@@ -751,32 +282,15 @@ LINE_GROUP_ID=${event.source.groupId}`
         );
       }
 
-      /*
-       * 群組測試仍然要等推播結果，
-       * 才能明確告訴使用者成功或失敗。
-       */
-      const testText = `✅ 群組通知測試成功
-
-發送人：${user.name}
-時間：${new Date().toLocaleString(
-        "zh-TW",
-        {
-          timeZone: "Asia/Taipei",
-        }
-      )}`;
-
       try {
-        console.log(
-          "GROUP_TEST_PUSH_START"
-        );
-
         await pushGroupMessage(
           client,
-          testText
-        );
+          `✅ 群組通知測試成功
 
-        console.log(
-          "GROUP_TEST_PUSH_SUCCESS"
+發送人：${user.name}
+時間：${new Date().toLocaleString("zh-TW", {
+            timeZone: "Asia/Taipei",
+          })}`
         );
 
         return replyText(
@@ -784,19 +298,18 @@ LINE_GROUP_ID=${event.source.groupId}`
           "✅ 已送出群組測試通知。"
         );
       } catch (err) {
-        logLineError(
-          "GROUP TEST PUSH FAILED",
-          err
+        console.error(
+          "GROUP_TEST_FAILED:",
+          err?.response?.data ||
+            err?.message ||
+            err
         );
 
         return replyText(
           event.replyToken,
           `❌ 群組測試通知失敗
 
-狀態碼：${getErrorStatus(err) || "未知"}
-原因：${err?.message || "LINE 群組通知發送失敗"}
-
-請稍後再試。`
+原因：${err?.message || "LINE 群組通知發送失敗"}`
         );
       }
     }
@@ -812,10 +325,7 @@ LINE_GROUP_ID=${event.source.groupId}`
       );
     }
 
-    /*
-     * 查詢指令優先。
-     * 查詢不寫入資料庫。
-     */
+    // 查詢指令一定優先，而且不寫入資料庫。
     if (
       text === "今天" ||
       text === "今日" ||
@@ -824,8 +334,7 @@ LINE_GROUP_ID=${event.source.groupId}`
     ) {
       clearSession(event);
 
-      const result =
-        await handleToday();
+      const result = await handleToday();
 
       return replyText(
         event.replyToken,
@@ -840,8 +349,7 @@ LINE_GROUP_ID=${event.source.groupId}`
     ) {
       clearSession(event);
 
-      const result =
-        await handleMonth();
+      const result = await handleMonth();
 
       return replyText(
         event.replyToken,
@@ -855,8 +363,7 @@ LINE_GROUP_ID=${event.source.groupId}`
     ) {
       clearSession(event);
 
-      const result =
-        await handleMyUnpaid(user);
+      const result = await handleMyUnpaid(user);
 
       return replyText(
         event.replyToken,
@@ -870,8 +377,7 @@ LINE_GROUP_ID=${event.source.groupId}`
     ) {
       clearSession(event);
 
-      const result =
-        await handleStock();
+      const result = await handleStock();
 
       return replyText(
         event.replyToken,
@@ -880,27 +386,22 @@ LINE_GROUP_ID=${event.source.groupId}`
     }
 
     /*
-     * 明確模式指令。
+     * 明確模式指令：
+     * 建立 Session，下一則訊息固定走指定流程。
      */
     if (
       text === "收入" ||
       text === "💰 收入" ||
       text === "今日收入"
     ) {
-      return startMode(
-        event,
-        "income"
-      );
+      return startMode(event, "income");
     }
 
     if (
       text === "支出" ||
       text === "💸 支出"
     ) {
-      return startMode(
-        event,
-        "expense"
-      );
+      return startMode(event, "expense");
     }
 
     if (
@@ -908,41 +409,56 @@ LINE_GROUP_ID=${event.source.groupId}`
       text === "💵 交款" ||
       text === "幹部交款"
     ) {
-      return startMode(
-        event,
-        "payment"
-      );
+      return startMode(event, "payment");
     }
 
-    /*
-     * 有 Session 時，
-     * 直接按照 Session 處理。
-     */
-    const handled =
-      await handleSessionInput(
-        event,
-        text,
-        user
-      );
+  /*
+ * 有 Session 時直接按照 Session 處理。
+ */
+if (
+  await handleSessionInput(
+    event,
+    text,
+    user
+  )
+) {
+  return;
+}
 
-    if (handled) {
-      return;
-    }
+/*
+ * Session 遺失保護：
+ * 如果收到完整收入表單，
+ * 直接當作收入處理。
+ */
+if (
+  text.startsWith("💰 收入＋耗球") ||
+  text.startsWith("💰 收入")
+) {
+  const resultText = await handleIncome(text, user);
 
-    console.log(
-      "EVENT NO MATCHED COMMAND:",
-      text
-    );
+  await replyText(event.replyToken, resultText);
 
-    return;
+  void notifyGroupSafely(
+    incomeNoticeKind(resultText),
+    user,
+    resultText,
+    event
+  );
+
+  return;
+}
+
+return;
   } catch (err) {
-    logLineError(
-      "HANDLE EVENT FAILED",
-      err
+    console.error(
+      "HANDLE_EVENT_FAILED:",
+      err?.response?.data ||
+        err?.message ||
+        err
     );
 
     try {
-      await replyText(
+      return await replyText(
         event.replyToken,
         `❌ 操作失敗
 
@@ -951,102 +467,33 @@ LINE_GROUP_ID=${event.source.groupId}`
 請輸入「收入」「支出」或「交款」重新操作。`
       );
     } catch (replyErr) {
-      logLineError(
-        "ERROR REPLY FAILED",
-        replyErr
+      console.error(
+        "ERROR_REPLY_FAILED:",
+        replyErr?.response?.data ||
+          replyErr?.message ||
+          replyErr
       );
-    }
-  } finally {
-    console.log(
-      "EVENT FINISH:",
-      eventId || "(no event id)",
-      `${Date.now() - eventStart} ms`
-    );
 
-    console.log(
-      "================================================"
-    );
-    console.log("");
+      return;
+    }
   }
 }
 
-const port =
-  process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 
 app.listen(port, () => {
-  console.log("");
-  console.log(
-    "=========================================="
-  );
-  console.log(
-    "BadmintonBot V10.1 DEBUG STARTED"
-  );
-  console.log(
-    "=========================================="
-  );
-  console.log(
-    "Node Version   :",
-    process.version
-  );
-  console.log(
-    "Environment    :",
-    process.env.NODE_ENV || "development"
-  );
-  console.log(
-    "Port           :",
-    port
-  );
-  console.log(
-    "LINE_GROUP_ID  :",
-    maskValue(
-      process.env.LINE_GROUP_ID
-    )
-  );
-  console.log(
-    "Channel Secret :",
-    process.env.LINE_CHANNEL_SECRET
-      ? "SET"
-      : "NOT SET"
-  );
-  console.log(
-    "Access Token   :",
-    process.env.LINE_CHANNEL_ACCESS_TOKEN
-      ? "SET"
-      : "NOT SET"
-  );
-  console.log(
-    "Start Time     :",
-    new Date().toLocaleString(
-      "zh-TW",
-      {
-        timeZone: "Asia/Taipei",
-      }
-    )
-  );
-  console.log(
-    "=========================================="
-  );
-  console.log("");
-
-  if (
-    typeof startDailyReport ===
-    "function"
-  ) {
+  if (typeof startDailyReport === "function") {
     try {
       startDailyReport(client);
-
-      console.log(
-        "DAILY_REPORT_STARTED"
-      );
     } catch (err) {
-      logLineError(
-        "START DAILY REPORT FAILED",
-        err
+      console.error(
+        "START_DAILY_REPORT_FAILED:",
+        err?.message || err
       );
     }
-  } else {
-    console.log(
-      "DAILY_REPORT_NOT_AVAILABLE"
-    );
   }
+
+  console.log(
+    `BadmintonBot V10 running on port ${port}`
+  );
 });
