@@ -52,9 +52,72 @@ console.log(
   "skipWeekends =",
   skipWeekends
 );
-console.log("TODAY =", day);
+function startDailyReport(client) {
+  const enabled =
+    String(process.env.DAILY_REPORT_ENABLED || "false")
+      .toLowerCase() === "true";
 
-const day = new Date().getDay(); // 0=星期日 6=星期六
+  if (!enabled) {
+    console.log("DAILY_REPORT_DISABLED");
+    return;
+  }
+
+  const { hour, minute } = parseDailyReportTime();
+  const cronExpr = `${minute} ${hour} * * *`;
+
+  cron.schedule(
+    cronExpr,
+    async () => {
+      try {
+        const skipWeekends =
+          String(
+            process.env.DAILY_REPORT_SKIP_WEEKENDS || "false"
+          ).toLowerCase() === "true";
+
+        const day = new Date().getDay(); // 0=星期日，6=星期六
+
+        console.log(
+          "DAILY_REPORT_SKIP_WEEKENDS =",
+          process.env.DAILY_REPORT_SKIP_WEEKENDS,
+          "skipWeekends =",
+          skipWeekends
+        );
+
+        console.log("TODAY =", day);
+
+        if (skipWeekends && (day === 0 || day === 6)) {
+          console.log("DAILY_REPORT_SKIP_WEEKEND");
+          return;
+        }
+
+        const text = await buildDailyReportText();
+        await pushGroupMessage(client, text);
+
+        console.log("DAILY_REPORT_SENT");
+      } catch (err) {
+        console.error(
+          "DAILY_REPORT_FAILED:",
+          err?.message || err
+        );
+      }
+    },
+    {
+      timezone: "Asia/Taipei",
+    }
+  );
+
+  console.log(
+    `DAILY_REPORT_ENABLED: ${String(hour).padStart(
+      2,
+      "0"
+    )}:${String(minute).padStart(2, "0")} Asia/Taipei`
+  );
+}
+
+module.exports = {
+  startDailyReport,
+  buildDailyReportText,
+};// 0=星期日 6=星期六
 
 if (skipWeekends && (day === 0 || day === 6)) {
   console.log("DAILY_REPORT_SKIP_WEEKEND");
