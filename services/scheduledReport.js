@@ -46,6 +46,13 @@ function startDailyReport(client) {
 const skipWeekends =
   String(process.env.DAILY_REPORT_SKIP_WEEKENDS || "false")
     .toLowerCase() === "true";
+console.log(
+  "DAILY_REPORT_SKIP_WEEKENDS =",
+  process.env.DAILY_REPORT_SKIP_WEEKENDS,
+  "skipWeekends =",
+  skipWeekends
+);
+console.log("TODAY =", day);
 
 const day = new Date().getDay(); // 0=星期日 6=星期六
 
