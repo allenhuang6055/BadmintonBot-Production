@@ -43,6 +43,16 @@ function startDailyReport(client) {
     cronExpr,
     async () => {
       try {
+const skipWeekends =
+  String(process.env.DAILY_REPORT_SKIP_WEEKENDS || "false")
+    .toLowerCase() === "true";
+
+const day = new Date().getDay(); // 0=星期日 6=星期六
+
+if (skipWeekends && (day === 0 || day === 6)) {
+  console.log("DAILY_REPORT_SKIP_WEEKEND");
+  return;
+}
         const text = await buildDailyReportText();
         await pushGroupMessage(client, text);
         console.log("DAILY_REPORT_SENT");
