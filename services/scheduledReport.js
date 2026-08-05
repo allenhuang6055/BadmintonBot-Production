@@ -2,6 +2,7 @@ const cron = require("node-cron");
 
 const {
   getSummary,
+  getCumulativeUnpaid,
   getCurrentStock,
   formatStock,
 } = require("./googleSheet");
@@ -36,17 +37,6 @@ function parseDailyReportTime() {
   };
 }
 
-/**
- * 取得台灣時間的星期。
- * 回傳值：
- * 0 = 星期日
- * 1 = 星期一
- * 2 = 星期二
- * 3 = 星期三
- * 4 = 星期四
- * 5 = 星期五
- * 6 = 星期六
- */
 function getTaipeiDay() {
   const weekday = new Intl.DateTimeFormat(
     "en-US",
@@ -69,21 +59,31 @@ function getTaipeiDay() {
   return dayMap[weekday];
 }
 
+function money(value) {
+  return Number(value || 0).toLocaleString("zh-TW");
+}
+
 async function buildDailyReportText() {
-  const today = await getSummary("today");
-  const stock = await getCurrentStock();
+  const [today, stock, cumulativeUnpaid] = await Promise.all([
+    getSummary("today"),
+    getCurrentStock(),
+    getCumulativeUnpaid(),
+  ]);
 
-  return `🏸【今日財務摘要】
+  const profitIcon = today.profit < 0 ? "📉" : "📈";
 
-收入：${today.income} 元
-支出：${today.expense} 元
-盈餘：${today.profit} 元
+  return `📊 今日統計
 
-耗球：${today.ballsUsed} 顆
-庫存：${formatStock(stock)}
+💰 收入：${money(today.income)} 元
+💸 支出：${money(today.expense)} 元
+${profitIcon} 今日盈餘：${money(today.profit)} 元
 
-交款：${today.payment} 元
-未交：${today.unpaid} 元`;
+💵 今日收款：${money(today.payment)} 元
+
+🏸 耗球：${money(today.ballsUsed)} 顆
+📦 庫存：${formatStock(stock)}
+
+🧾 累積未交款：${money(cumulativeUnpaid)} 元`;
 }
 
 function startDailyReport(client) {

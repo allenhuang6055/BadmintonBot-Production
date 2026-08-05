@@ -207,7 +207,7 @@ function isSameMonth(dateText, now) {
 }
 
 async function getSummary(scope, userId = null) {
-  const rows = await getRows(DB_SHEET, "A:AA");
+  const rows = await getRows(DB_SHEET, "A:AB");
   const now = new Date();
 
   let income = 0;
@@ -215,6 +215,7 @@ async function getSummary(scope, userId = null) {
   let payment = 0;
   let ballsUsed = 0;
   let ballsIn = 0;
+  let unpaidDeduction = 0;
 
   for (const row of rows.slice(3)) {
     const date = row[0];
@@ -227,11 +228,22 @@ async function getSummary(scope, userId = null) {
     const match = scope === "today" ? isSameDay(date, now) : isSameMonth(date, now);
     if (!match) continue;
 
-    income += n(row[22] ?? row[5]);
-    expense += n(row[23] ?? row[6]);
-    ballsUsed += n(row[24] ?? row[7]);
-    ballsIn += n(row[25] ?? row[8]);
-    payment += n(row[26] ?? row[9]);
+    const finalIncome = n(row[22] ?? row[5]);
+    const finalExpense = n(row[23] ?? row[6]);
+    const finalBallsUsed = n(row[24] ?? row[7]);
+    const finalBallsIn = n(row[25] ?? row[8]);
+    const finalPayment = n(row[26] ?? row[9]);
+    const deductFlag = String(row[27] || "").trim().toUpperCase();
+
+    income += finalIncome;
+    expense += finalExpense;
+    ballsUsed += finalBallsUsed;
+    ballsIn += finalBallsIn;
+    payment += finalPayment;
+
+    if (deductFlag === "Y") {
+      unpaidDeduction += finalExpense;
+    }
   }
 
   return {
@@ -241,8 +253,64 @@ async function getSummary(scope, userId = null) {
     ballsUsed,
     ballsIn,
     profit: income - expense,
-    unpaid: income - payment,
+    unpaid: Math.max(0, income - payment - unpaidDeduction),
   };
+}
+
+/**
+ * 累積未交款：
+ * - 依每位填表人分開計算「累積收入－累積交款－抵扣未交款支出」。
+ * - 每人的結果若小於 0，視為 0。
+ * - 最後將每個人的未交款加總。
+ *
+ * 這樣可避免某位幹部多交款，抵消另一位幹部仍未交的金額。
+ */
+async function getCumulativeUnpaid(userId = null) {
+  const rows = await getRows(DB_SHEET, "A:AB");
+  const byUser = new Map();
+
+  for (const row of rows.slice(3)) {
+    const status = String(row[11] || "").trim() || "有效";
+    if (status !== "有效") continue;
+
+    const lineId = String(row[1] || "").trim();
+    if (userId && lineId !== userId) continue;
+
+    const userName = String(row[2] || "").trim();
+    const key = lineId || `NAME:${userName || "未命名"}`;
+
+    if (!byUser.has(key)) {
+      byUser.set(key, {
+        income: 0,
+        payment: 0,
+        unpaidDeduction: 0,
+      });
+    }
+
+    const item = byUser.get(key);
+    const finalIncome = n(row[22] ?? row[5]);
+    const finalExpense = n(row[23] ?? row[6]);
+    const finalPayment = n(row[26] ?? row[9]);
+    const deductFlag = String(row[27] || "").trim().toUpperCase();
+
+    item.income += finalIncome;
+    item.payment += finalPayment;
+
+    if (deductFlag === "Y") {
+      item.unpaidDeduction += finalExpense;
+    }
+  }
+
+  let total = 0;
+
+  for (const item of byUser.values()) {
+    total += Math.max(
+      0,
+      item.income - item.payment - item.unpaidDeduction
+    );
+  }
+
+  return total;
 }
 
 async function getCurrentStock() {
@@ -317,6 +385,7 @@ module.exports = {
   getEnabledItems,
   appendRecords,
   getSummary,
+  getCumulativeUnpaid,
   getCurrentStock,
   formatStock,
   getCurrentBalance,

@@ -1,5 +1,6 @@
 const {
   getSummary,
+  getCumulativeUnpaid,
   getCurrentStock,
   formatStock,
   getCurrentBalance,
@@ -33,29 +34,41 @@ function money(value) {
   return Number(value || 0).toLocaleString("zh-TW");
 }
 
-function formatSummary(title, s, stock = null) {
+function formatSummary(title, s, stock, cumulativeUnpaid) {
+  const profitIcon = s.profit < 0 ? "📉" : "📈";
+
   return `📊 ${title}
 
-收入：${money(s.income)} 元
-支出：${money(s.expense)} 元
-盈餘：${money(s.profit)} 元
+💰 收入：${money(s.income)} 元
+💸 支出：${money(s.expense)} 元
+${profitIcon} 今日盈餘：${money(s.profit)} 元
 
-交款：${money(s.payment)} 元
-未交：${money(s.unpaid)} 元
-耗球：${money(s.ballsUsed)} 顆${stock === null ? "" : `\n庫存：${formatStock(stock)}`}`;
+💵 今日收款：${money(s.payment)} 元
+
+🏸 耗球：${money(s.ballsUsed)} 顆
+📦 庫存：${formatStock(stock)}
+
+🧾 累積未交款：${money(cumulativeUnpaid)} 元`;
 }
 
 async function handleToday() {
-  const s = await getSummary("today");
-  const stock = await getCurrentStock();
-  return formatSummary("今日統計", s, stock);
+  const [s, stock, cumulativeUnpaid] = await Promise.all([
+    getSummary("today"),
+    getCurrentStock(),
+    getCumulativeUnpaid(),
+  ]);
+
+  return formatSummary("今日統計", s, stock, cumulativeUnpaid);
 }
 
 async function handleMonth() {
-  const s = await getSummary("month");
-  const stock = await getCurrentStock();
-  const balance = await getCurrentBalance();
-  const safetyCash = await getSafetyCash();
+  const [s, stock, balance, safetyCash, cumulativeUnpaid] = await Promise.all([
+    getSummary("month"),
+    getCurrentStock(),
+    getCurrentBalance(),
+    getSafetyCash(),
+    getCumulativeUnpaid(),
+  ]);
 
   return `🏸【健好羽球 月報】
 
@@ -85,11 +98,11 @@ ${formatStock(stock)}
 
 ════════════════
 
-💵 本月交款
+💵 本月收款
 ${money(s.payment)} 元
 
-📋 未交款
-${money(s.unpaid)} 元
+🧾 累積未交款
+${money(cumulativeUnpaid)} 元
 
 ════════════════
 
@@ -106,14 +119,18 @@ ${nowTaipeiText()}`;
 }
 
 async function handleMyUnpaid(user) {
-  const s = await getSummary("month", user.id);
+  const [s, cumulativeUnpaid] = await Promise.all([
+    getSummary("month", user.id),
+    getCumulativeUnpaid(user.id),
+  ]);
+
   return `👤 我的未交
 
 填表人：${user.name}
 
 本月收入：${money(s.income)} 元
-本月交款：${money(s.payment)} 元
-尚未交回：${money(s.unpaid)} 元`;
+本月收款：${money(s.payment)} 元
+累積未交款：${money(cumulativeUnpaid)} 元`;
 }
 
 async function handleStock() {
