@@ -30,7 +30,7 @@ function getSheets() {
   });
 }
 
-async function getRows(sheetName, range = "A:AA") {
+async function getRows(sheetName, range = "A:AB") {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
@@ -54,7 +54,7 @@ async function writeRows(sheetName, values) {
   const sheets = getSheets();
   const nextRow = await findNextWriteRow(sheetName);
   const endRow = nextRow + values.length - 1;
-  const targetRange = sheetRange(sheetName, `A${nextRow}:AA${endRow}`);
+  const targetRange = sheetRange(sheetName, `A${nextRow}:AB${endRow}`);
 
   console.log("WRITE_TARGET:", targetRange);
   console.log("WRITE_VALUES:", JSON.stringify(values));
@@ -168,7 +168,15 @@ async function appendRecords(records, user) {
       payment,     // AA 最終交款
     ];
 
-    return raw.concat(corrections).concat(finals);
+    const deductUnpaid =
+      r.type === "支出"
+        ? (r.deductUnpaid ? "Y" : "N")
+        : "";
+
+    return raw
+      .concat(corrections)
+      .concat(finals)
+      .concat([deductUnpaid]); // AB 抵扣未交款
   });
 
   return writeRows(DB_SHEET, values);
