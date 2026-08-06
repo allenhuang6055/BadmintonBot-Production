@@ -377,6 +377,146 @@ async function getUnpaidList(userId = null) {
     });
 }
 
+
+function startOfDay(date) {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    0,
+    0,
+    0,
+    0
+  );
+}
+
+function endOfDay(date) {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    23,
+    59,
+    59,
+    999
+  );
+}
+
+async function getRangeSummary(startDate, endDate) {
+  const rows = await getRows(DB_SHEET, "A:AB");
+  const start = startOfDay(startDate);
+  const end = endOfDay(endDate);
+
+  let income = 0;
+  let expense = 0;
+  let payment = 0;
+  let ballsUsed = 0;
+  let ballsIn = 0;
+
+  for (const row of rows.slice(3)) {
+    const status = String(row[11] || "").trim() || "有效";
+    if (status !== "有效") continue;
+
+    const rowDate = parseDate(row[0]);
+    if (!rowDate || rowDate < start || rowDate > end) continue;
+
+    income += n(row[22] ?? row[5]);
+    expense += n(row[23] ?? row[6]);
+    ballsUsed += n(row[24] ?? row[7]);
+    ballsIn += n(row[25] ?? row[8]);
+    payment += n(row[26] ?? row[9]);
+  }
+
+  return {
+    income,
+    expense,
+    payment,
+    ballsUsed,
+    ballsIn,
+    profit: income - expense,
+  };
+}
+
+async function getBalanceAt(endDate) {
+  let initialCash = 0;
+
+  try {
+    const homeRows = await getRows(HOME_SHEET, "B5:B5");
+    initialCash = n(homeRows[0]?.[0]);
+  } catch (err) {
+    console.error("READ_INITIAL_CASH_FAILED:", err.message);
+  }
+
+  const rows = await getRows(DB_SHEET, "A:AA");
+  const end = endOfDay(endDate);
+
+  let income = 0;
+  let expense = 0;
+
+  for (const row of rows.slice(3)) {
+    const status = String(row[11] || "").trim() || "有效";
+    if (status !== "有效") continue;
+
+    const rowDate = parseDate(row[0]);
+    if (!rowDate || rowDate > end) continue;
+
+    income += n(row[22] ?? row[5]);
+    expense += n(row[23] ?? row[6]);
+  }
+
+  return initialCash + income - expense;
+}
+
+async function getCumulativeUnpaidAt(endDate) {
+  const rows = await getRows(DB_SHEET, "A:AB");
+  const end = endOfDay(endDate);
+  const byUser = new Map();
+
+  for (const row of rows.slice(3)) {
+    const status = String(row[11] || "").trim() || "有效";
+    if (status !== "有效") continue;
+
+    const rowDate = parseDate(row[0]);
+    if (!rowDate || rowDate > end) continue;
+
+    const lineId = String(row[1] || "").trim();
+    const userName = String(row[2] || "").trim();
+    const key = lineId || `NAME:${userName || "未命名"}`;
+
+    if (!byUser.has(key)) {
+      byUser.set(key, {
+        income: 0,
+        payment: 0,
+        unpaidDeduction: 0,
+      });
+    }
+
+    const item = byUser.get(key);
+    const finalIncome = n(row[22] ?? row[5]);
+    const finalExpense = n(row[23] ?? row[6]);
+    const finalPayment = n(row[26] ?? row[9]);
+    const deductFlag = String(row[27] || "").trim().toUpperCase();
+
+    item.income += finalIncome;
+    item.payment += finalPayment;
+
+    if (deductFlag === "Y") {
+      item.unpaidDeduction += finalExpense;
+    }
+  }
+
+  let total = 0;
+
+  for (const item of byUser.values()) {
+    total += Math.max(
+      0,
+      item.income - item.payment - item.unpaidDeduction
+    );
+  }
+
+  return total;
+}
+
 async function getCurrentStock() {
   const rows = await getRows(DB_SHEET, "A:AA");
   let ballsUsed = 0;
@@ -451,6 +591,9 @@ module.exports = {
   getSummary,
   getCumulativeUnpaid,
   getUnpaidList,
+  getRangeSummary,
+  getBalanceAt,
+  getCumulativeUnpaidAt,
   getCurrentStock,
   formatStock,
   getCurrentBalance,

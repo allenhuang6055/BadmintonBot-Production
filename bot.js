@@ -26,6 +26,7 @@ const {
   handleMonth,
   handleMyUnpaid,
   handleStock,
+  handleRangeQuery,
 } = require("./commands/query");
 
 let startDailyReport = null;
@@ -326,6 +327,18 @@ LINE_GROUP_ID=${event.source.groupId}`
     }
 
     // 查詢指令一定優先，而且不寫入資料庫。
+
+    if (/^查(?:\s|　|$)/.test(text)) {
+      clearSession(event);
+
+      const result = await handleRangeQuery(text);
+
+      return replyText(
+        event.replyToken,
+        result
+      );
+    }
+
     if (
       text === "今天" ||
       text === "今日" ||
