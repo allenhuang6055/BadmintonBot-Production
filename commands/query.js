@@ -1,6 +1,7 @@
 const {
   getSummary,
   getCumulativeUnpaid,
+  getUnpaidList,
   getCurrentStock,
   formatStock,
   getCurrentBalance,
@@ -34,7 +35,21 @@ function money(value) {
   return Number(value || 0).toLocaleString("zh-TW");
 }
 
-function formatSummary(title, s, stock, cumulativeUnpaid) {
+function formatUnpaidList(unpaidList) {
+  if (!unpaidList.length) {
+    return "✅ 目前無未交款";
+  }
+
+  const lines = unpaidList.map(
+    (item) => `${item.name}　${money(item.unpaid)} 元`
+  );
+
+  return `📋 未交名單
+
+${lines.join("\n")}`;
+}
+
+function formatSummary(title, s, stock, cumulativeUnpaid, unpaidList) {
   const profitIcon = s.profit < 0 ? "📉" : "📈";
 
   return `📊 ${title}
@@ -48,17 +63,26 @@ ${profitIcon} 今日盈餘：${money(s.profit)} 元
 🏸 耗球：${money(s.ballsUsed)} 顆
 📦 庫存：${formatStock(stock)}
 
-🧾 累積未交款：${money(cumulativeUnpaid)} 元`;
+🧾 累積未交款：${money(cumulativeUnpaid)} 元
+
+${formatUnpaidList(unpaidList)}`;
 }
 
 async function handleToday() {
-  const [s, stock, cumulativeUnpaid] = await Promise.all([
+  const [s, stock, cumulativeUnpaid, unpaidList] = await Promise.all([
     getSummary("today"),
     getCurrentStock(),
     getCumulativeUnpaid(),
+    getUnpaidList(),
   ]);
 
-  return formatSummary("今日統計", s, stock, cumulativeUnpaid);
+  return formatSummary(
+    "今日統計",
+    s,
+    stock,
+    cumulativeUnpaid,
+    unpaidList
+  );
 }
 
 async function handleMonth() {

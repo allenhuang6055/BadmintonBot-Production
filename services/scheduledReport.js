@@ -3,6 +3,7 @@ const cron = require("node-cron");
 const {
   getSummary,
   getCumulativeUnpaid,
+  getUnpaidList,
   getCurrentStock,
   formatStock,
 } = require("./googleSheet");
@@ -63,11 +64,26 @@ function money(value) {
   return Number(value || 0).toLocaleString("zh-TW");
 }
 
+function formatUnpaidList(unpaidList) {
+  if (!unpaidList.length) {
+    return "✅ 目前無未交款";
+  }
+
+  const lines = unpaidList.map(
+    (item) => `${item.name}　${money(item.unpaid)} 元`
+  );
+
+  return `📋 未交名單
+
+${lines.join("\n")}`;
+}
+
 async function buildDailyReportText() {
-  const [today, stock, cumulativeUnpaid] = await Promise.all([
+  const [today, stock, cumulativeUnpaid, unpaidList] = await Promise.all([
     getSummary("today"),
     getCurrentStock(),
     getCumulativeUnpaid(),
+    getUnpaidList(),
   ]);
 
   const profitIcon = today.profit < 0 ? "📉" : "📈";
@@ -83,7 +99,9 @@ ${profitIcon} 今日盈餘：${money(today.profit)} 元
 🏸 耗球：${money(today.ballsUsed)} 顆
 📦 庫存：${formatStock(stock)}
 
-🧾 累積未交款：${money(cumulativeUnpaid)} 元`;
+🧾 累積未交款：${money(cumulativeUnpaid)} 元
+
+${formatUnpaidList(unpaidList)}`;
 }
 
 function startDailyReport(client) {

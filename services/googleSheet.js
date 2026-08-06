@@ -313,6 +313,70 @@ async function getCumulativeUnpaid(userId = null) {
   return total;
 }
 
+
+/**
+ * 未交名單：
+ * - 依每位填表人分開計算累積未交款。
+ * - 只回傳未交款大於 0 的人。
+ * - 已納入 AB 欄「抵扣未交款」支出。
+ * - 依未交金額由高到低排列。
+ */
+async function getUnpaidList(userId = null) {
+  const rows = await getRows(DB_SHEET, "A:AB");
+  const byUser = new Map();
+
+  for (const row of rows.slice(3)) {
+    const status = String(row[11] || "").trim() || "有效";
+    if (status !== "有效") continue;
+
+    const lineId = String(row[1] || "").trim();
+    if (userId && lineId !== userId) continue;
+
+    const userName = String(row[2] || "").trim();
+    const key = lineId || `NAME:${userName || "未命名"}`;
+
+    if (!byUser.has(key)) {
+      byUser.set(key, {
+        name: userName || "未命名",
+        income: 0,
+        payment: 0,
+        unpaidDeduction: 0,
+      });
+    }
+
+    const item = byUser.get(key);
+
+    // 名稱若後來有更新，以最新的非空白名稱為準。
+    if (userName) item.name = userName;
+
+    const finalIncome = n(row[22] ?? row[5]);
+    const finalExpense = n(row[23] ?? row[6]);
+    const finalPayment = n(row[26] ?? row[9]);
+    const deductFlag = String(row[27] || "").trim().toUpperCase();
+
+    item.income += finalIncome;
+    item.payment += finalPayment;
+
+    if (deductFlag === "Y") {
+      item.unpaidDeduction += finalExpense;
+    }
+  }
+
+  return Array.from(byUser.values())
+    .map((item) => ({
+      name: item.name,
+      unpaid: Math.max(
+        0,
+        item.income - item.payment - item.unpaidDeduction
+      ),
+    }))
+    .filter((item) => item.unpaid > 0)
+    .sort((a, b) => {
+      if (b.unpaid !== a.unpaid) return b.unpaid - a.unpaid;
+      return a.name.localeCompare(b.name, "zh-Hant");
+    });
+}
+
 async function getCurrentStock() {
   const rows = await getRows(DB_SHEET, "A:AA");
   let ballsUsed = 0;
@@ -386,6 +450,7 @@ module.exports = {
   appendRecords,
   getSummary,
   getCumulativeUnpaid,
+  getUnpaidList,
   getCurrentStock,
   formatStock,
   getCurrentBalance,
