@@ -91,6 +91,23 @@ async function replyMessages(replyToken, messages) {
 }
 
 async function notifyGroupSafely(kind, user, resultText, event) {
+  // V10.1：預設關閉「私訊記帳完成後主動 Push 群組」，
+  // 避免消耗 LINE 官方帳號每月免費 Push 訊息額度。
+  //
+  // 如果未來要重新開啟，可在 Render Environment 設定：
+  // PRIVATE_GROUP_NOTIFY_ENABLED=true
+  const privateGroupNotifyEnabled =
+    String(process.env.PRIVATE_GROUP_NOTIFY_ENABLED || "false")
+      .trim()
+      .toLowerCase() === "true";
+
+  if (!privateGroupNotifyEnabled) {
+    console.log(
+      "GROUP_NOTIFY_SKIPPED: PRIVATE_GROUP_NOTIFY_ENABLED is false"
+    );
+    return;
+  }
+
   try {
     if (event?.source?.type === "group") {
       console.log(
