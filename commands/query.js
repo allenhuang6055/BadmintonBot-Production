@@ -1,4 +1,4 @@
-const {
+﻿const {
   getSummary,
   getCumulativeUnpaid,
   getUnpaidList,
@@ -6,6 +6,7 @@ const {
   getBalanceAt,
   getCumulativeUnpaidAt,
   getCurrentStock,
+  getTicketStock,
   formatStock,
   getCurrentBalance,
   getSafetyCash,
@@ -160,6 +161,22 @@ async function handleMyUnpaid(user) {
 累積未交款：${money(cumulativeUnpaid)} 元`;
 }
 
+async function handleTicketStock() {
+  const stock = await getTicketStock();
+
+  const books = Math.floor(stock / 50);
+  const sheets = stock % 50;
+  const value = stock * 16;
+
+  return `🎫 球券庫存
+
+目前庫存：${stock.toLocaleString("zh-TW")} 張
+換算：${books} 本 + ${sheets} 張
+
+每本：50 張
+每張：16 元
+庫存面額：${value.toLocaleString("zh-TW")} 元`;
+}
 async function handleStock() {
   const stock = await getCurrentStock();
   return `🏸 羽球庫存
@@ -425,9 +442,13 @@ ${profitIcon} 盈餘：${money(summary.profit)} 元
 }
 
 module.exports = {
+  handleTicketStock,
   handleToday,
   handleMonth,
   handleMyUnpaid,
   handleStock,
   handleRangeQuery,
 };
+
+
+

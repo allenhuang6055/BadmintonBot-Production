@@ -1,4 +1,4 @@
-require("dotenv").config();
+﻿require("dotenv").config();
 const { google } = require("googleapis");
 
 const DB_SHEET = "02_LINE資料庫";
@@ -585,7 +585,32 @@ function getStockStatus(balls) {
   return "🟢 庫存狀態：正常";
 }
 
+
+async function getTicketStock() {
+  const rows = await getRows("10_球券庫存", "A:K");
+
+  let stock = 0;
+
+  for (const row of rows.slice(1)) {
+    const action = String(row[3] || "").trim();
+    const stockIn = Number(String(row[4] || "0").replace(/,/g, "")) || 0;
+    const sold = Number(String(row[5] || "0").replace(/,/g, "")) || 0;
+    const issued = Number(String(row[6] || "0").replace(/,/g, "")) || 0;
+    const status = String(row[9] || "").trim() || "有效";
+
+    if (status !== "有效") continue;
+
+    if (action === "期初盤點") {
+      stock = stockIn;
+    } else {
+      stock += stockIn - sold - issued;
+    }
+  }
+
+  return stock;
+}
 module.exports = {
+  getTicketStock,
   getEnabledItems,
   appendRecords,
   getSummary,
@@ -601,3 +626,4 @@ module.exports = {
   getCashStatus,
   getStockStatus,
 };
+

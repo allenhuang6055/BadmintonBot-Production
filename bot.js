@@ -1,4 +1,4 @@
-require("dotenv").config();
+﻿require("dotenv").config();
 
 const express = require("express");
 const line = require("@line/bot-sdk");
@@ -26,6 +26,7 @@ const {
   handleMonth,
   handleMyUnpaid,
   handleStock,
+  handleTicketStock,
   handleRangeQuery,
 } = require("./commands/query");
 
@@ -415,6 +416,20 @@ LINE_GROUP_ID=${event.source.groupId}`
       );
     }
 
+    if (
+      text === "球券庫存" ||
+      text === "球券"
+    ) {
+      clearSession(event);
+
+      const result = await handleTicketStock();
+
+      return replyText(
+        event.replyToken,
+        result
+      );
+    }
+
     /*
      * 明確模式指令：
      * 建立 Session，下一則訊息固定走指定流程。
@@ -527,3 +542,4 @@ app.listen(port, () => {
     `BadmintonBot V10 running on port ${port}`
   );
 });
+
