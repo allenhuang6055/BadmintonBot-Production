@@ -617,18 +617,20 @@ async function appendTicketIn(qty, user) {
     throw new Error("球券入庫張數必須大於 0");
   }
 
+  const now = taipeiNow();
+
   const row = [
-    taipeiDate(),                           // A 日期
-    user?.name || user?.displayName || "", // B 操作者
-    n,                                      // C 進貨
-    "",                                     // D 領用
-    "",                                     // E 發放
-    "",                                     // F 作廢
-    "",                                     // G
-    "",                                     // H
-    "",                                     // I
-    "",                                     // J
-    "LINE球券入庫"                          // K 備註
+    taipeiDate(),                         // A 日期
+    user?.userId || "",                   // B 填表人id
+    user?.name || user?.displayName || "",// C 填表人
+    "入庫",                               // D 動作
+    n,                                    // E 入庫張數
+    0,                                    // F 售出張數
+    0,                                    // G 發放張數
+    0,                                    // H 收入金額
+    "LINE球券入庫",                       // I 備註
+    "有效",                               // J 狀態
+    now                                   // K 建立時間
   ];
 
   await writeRows("10_球券庫存", [row]);
@@ -653,6 +655,7 @@ module.exports = {
   getCashStatus,
   getStockStatus,
 };
+
 
 
 
