@@ -461,6 +461,14 @@ LINE_GROUP_ID=${event.source.groupId}`
      * 明確模式指令：
      * 建立 Session，下一則訊息固定走指定流程。
      */
+  if (
+    text === "球券入庫" ||
+    text === "🎟️ 球券入庫"
+  ) {
+    clearSession(event);
+    return startMode(event, "ticketIn");
+  }
+
     if (
       text === "收入" ||
       text === "💰 收入" ||
