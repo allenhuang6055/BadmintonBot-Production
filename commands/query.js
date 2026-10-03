@@ -7,6 +7,8 @@ const {
   getCumulativeUnpaidAt,
   getCurrentStock,
   formatStock,
+  getTicketStock,
+  formatTicketStock,
   getCurrentBalance,
   getSafetyCash,
   getCashStatus,
@@ -169,6 +171,20 @@ async function handleStock() {
 ${getStockStatus(stock)}
 
 提醒：耗球請在「收入＋耗球」模板一起輸入。`;
+}
+
+
+async function handleTicketStock() {
+  const stock = await getTicketStock();
+  const value = stock * 16;
+
+  return `🎫 球券庫存
+
+目前庫存：${money(stock)} 張
+折合：${formatTicketStock(stock)}
+
+每張：16 元
+票面價值：${money(value)} 元`;
 }
 
 
@@ -429,5 +445,6 @@ module.exports = {
   handleMonth,
   handleMyUnpaid,
   handleStock,
+  handleTicketStock,
   handleRangeQuery,
 };

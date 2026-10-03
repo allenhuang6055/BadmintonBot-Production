@@ -26,6 +26,7 @@ const {
   handleMonth,
   handleMyUnpaid,
   handleStock,
+  handleTicketStock,
   handleRangeQuery,
 } = require("./commands/query");
 
@@ -408,6 +409,20 @@ LINE_GROUP_ID=${event.source.groupId}`
       clearSession(event);
 
       const result = await handleStock();
+
+      return replyText(
+        event.replyToken,
+        result
+      );
+    }
+
+    if (
+      text === "球券庫存" ||
+      text === "🎫 球券庫存"
+    ) {
+      clearSession(event);
+
+      const result = await handleTicketStock();
 
       return replyText(
         event.replyToken,

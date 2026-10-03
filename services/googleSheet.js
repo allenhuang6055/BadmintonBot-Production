@@ -4,6 +4,7 @@ const { google } = require("googleapis");
 const DB_SHEET = "02_LINE資料庫";
 const SETTINGS_SHEET = "08_項目設定";
 const HOME_SHEET = "00_首頁";
+const TICKET_STOCK_SHEET = "10_球券庫存";
 
 function sheetRange(sheetName, range) {
   return `'${sheetName}'!${range}`;
@@ -541,6 +542,31 @@ async function getCurrentStock() {
   return initialStock + ballsIn - ballsUsed;
 }
 
+async function getTicketStock() {
+  const rows = await getRows(TICKET_STOCK_SHEET, "A:K");
+  let stock = 0;
+
+  for (const row of rows.slice(1)) {
+    const status = String(row[9] || "").trim() || "有效";
+    if (status !== "有效") continue;
+
+    stock += n(row[4]); // E 入庫張數（期初也記在這裡）
+    stock -= n(row[5]); // F 售出張數
+    stock -= n(row[6]); // G 發放張數
+  }
+
+  return stock;
+}
+
+function formatTicketStock(tickets) {
+  const value = Number(tickets || 0);
+  const sign = value < 0 ? "-" : "";
+  const abs = Math.abs(value);
+  const books = Math.floor(abs / 50);
+  const rest = abs % 50;
+  return `${sign}${books}本 + ${rest}張`;
+}
+
 async function getCurrentBalance() {
   let initialCash = 0;
   try {
@@ -596,6 +622,8 @@ module.exports = {
   getCumulativeUnpaidAt,
   getCurrentStock,
   formatStock,
+  getTicketStock,
+  formatTicketStock,
   getCurrentBalance,
   getSafetyCash,
   getCashStatus,
