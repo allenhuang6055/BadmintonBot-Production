@@ -4,7 +4,6 @@ const { google } = require("googleapis");
 const DB_SHEET = "02_LINE資料庫";
 const SETTINGS_SHEET = "08_項目設定";
 const HOME_SHEET = "00_首頁";
-const TICKET_SHEET = "10_球券庫存";
 
 function sheetRange(sheetName, range) {
   return `'${sheetName}'!${range}`;
@@ -378,146 +377,6 @@ async function getUnpaidList(userId = null) {
     });
 }
 
-
-function startOfDay(date) {
-  return new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    0,
-    0,
-    0,
-    0
-  );
-}
-
-function endOfDay(date) {
-  return new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    23,
-    59,
-    59,
-    999
-  );
-}
-
-async function getRangeSummary(startDate, endDate) {
-  const rows = await getRows(DB_SHEET, "A:AB");
-  const start = startOfDay(startDate);
-  const end = endOfDay(endDate);
-
-  let income = 0;
-  let expense = 0;
-  let payment = 0;
-  let ballsUsed = 0;
-  let ballsIn = 0;
-
-  for (const row of rows.slice(3)) {
-    const status = String(row[11] || "").trim() || "有效";
-    if (status !== "有效") continue;
-
-    const rowDate = parseDate(row[0]);
-    if (!rowDate || rowDate < start || rowDate > end) continue;
-
-    income += n(row[22] ?? row[5]);
-    expense += n(row[23] ?? row[6]);
-    ballsUsed += n(row[24] ?? row[7]);
-    ballsIn += n(row[25] ?? row[8]);
-    payment += n(row[26] ?? row[9]);
-  }
-
-  return {
-    income,
-    expense,
-    payment,
-    ballsUsed,
-    ballsIn,
-    profit: income - expense,
-  };
-}
-
-async function getBalanceAt(endDate) {
-  let initialCash = 0;
-
-  try {
-    const homeRows = await getRows(HOME_SHEET, "B5:B5");
-    initialCash = n(homeRows[0]?.[0]);
-  } catch (err) {
-    console.error("READ_INITIAL_CASH_FAILED:", err.message);
-  }
-
-  const rows = await getRows(DB_SHEET, "A:AA");
-  const end = endOfDay(endDate);
-
-  let income = 0;
-  let expense = 0;
-
-  for (const row of rows.slice(3)) {
-    const status = String(row[11] || "").trim() || "有效";
-    if (status !== "有效") continue;
-
-    const rowDate = parseDate(row[0]);
-    if (!rowDate || rowDate > end) continue;
-
-    income += n(row[22] ?? row[5]);
-    expense += n(row[23] ?? row[6]);
-  }
-
-  return initialCash + income - expense;
-}
-
-async function getCumulativeUnpaidAt(endDate) {
-  const rows = await getRows(DB_SHEET, "A:AB");
-  const end = endOfDay(endDate);
-  const byUser = new Map();
-
-  for (const row of rows.slice(3)) {
-    const status = String(row[11] || "").trim() || "有效";
-    if (status !== "有效") continue;
-
-    const rowDate = parseDate(row[0]);
-    if (!rowDate || rowDate > end) continue;
-
-    const lineId = String(row[1] || "").trim();
-    const userName = String(row[2] || "").trim();
-    const key = lineId || `NAME:${userName || "未命名"}`;
-
-    if (!byUser.has(key)) {
-      byUser.set(key, {
-        income: 0,
-        payment: 0,
-        unpaidDeduction: 0,
-      });
-    }
-
-    const item = byUser.get(key);
-    const finalIncome = n(row[22] ?? row[5]);
-    const finalExpense = n(row[23] ?? row[6]);
-    const finalPayment = n(row[26] ?? row[9]);
-    const deductFlag = String(row[27] || "").trim().toUpperCase();
-
-    item.income += finalIncome;
-    item.payment += finalPayment;
-
-    if (deductFlag === "Y") {
-      item.unpaidDeduction += finalExpense;
-    }
-  }
-
-  let total = 0;
-
-  for (const item of byUser.values()) {
-    total += Math.max(
-      0,
-      item.income - item.payment - item.unpaidDeduction
-    );
-  }
-
-  return total;
-}
-
 async function getCurrentStock() {
   const rows = await getRows(DB_SHEET, "A:AA");
   let ballsUsed = 0;
@@ -540,65 +399,6 @@ async function getCurrentStock() {
   }
 
   return initialStock + ballsIn - ballsUsed;
-}
-
-
-async function getTicketStock() {
-  const rows = await getRows(TICKET_SHEET, "A:K");
-  let stock = 0;
-
-  for (const row of rows.slice(1)) {
-    const status = String(row[9] || "").trim() || "有效";
-    if (status !== "有效") continue;
-
-    stock += n(row[4]); // E 入庫張數（期初也放這裡）
-    stock -= n(row[5]); // F 售出張數
-    stock -= n(row[6]); // G 發放張數
-  }
-
-  return stock;
-}
-
-function formatTicketStock(tickets) {
-  const value = Number(tickets || 0);
-  const sign = value < 0 ? "-" : "";
-  const abs = Math.abs(value);
-  const books = Math.floor(abs / 50);
-  const rest = abs % 50;
-  return `${sign}${books}本 + ${rest}張`;
-}
-
-async function appendTicketRecord(record, user) {
-  const sheets = getSheets();
-  const rows = await getRows(TICKET_SHEET, "A:A");
-  let nextRow = 2;
-
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i] && rows[i][0]) nextRow = i + 2;
-  }
-
-  const values = [[
-    record.date || taipeiDate(),       // A 日期
-    user?.id || "",                    // B 填表人ID
-    user?.name || "",                  // C 填表人
-    record.action || "",               // D 動作
-    record.inQty || 0,                 // E 入庫張數
-    record.soldQty || 0,               // F 售出張數
-    record.giveQty || 0,               // G 發放張數
-    record.income || 0,                // H 收入金額
-    record.note || "",                 // I 備註
-    "有效",                            // J 狀態
-    taipeiNow(),                       // K 建立時間
-  ]];
-
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: sheetRange(TICKET_SHEET, `A${nextRow}:K${nextRow}`),
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values },
-  });
-
-  return nextRow;
 }
 
 async function getCurrentBalance() {
@@ -651,15 +451,9 @@ module.exports = {
   getSummary,
   getCumulativeUnpaid,
   getUnpaidList,
-  getRangeSummary,
-  getBalanceAt,
-  getCumulativeUnpaidAt,
   getCurrentStock,
   formatStock,
   getCurrentBalance,
-  getTicketStock,
-  formatTicketStock,
-  appendTicketRecord,
   getSafetyCash,
   getCashStatus,
   getStockStatus,

@@ -4,7 +4,6 @@ const { google } = require("googleapis");
 const DB_SHEET = "02_LINE資料庫";
 const SETTINGS_SHEET = "08_項目設定";
 const HOME_SHEET = "00_首頁";
-const TICKET_SHEET = "10_球券庫存";
 
 function sheetRange(sheetName, range) {
   return `'${sheetName}'!${range}`;
@@ -542,65 +541,6 @@ async function getCurrentStock() {
   return initialStock + ballsIn - ballsUsed;
 }
 
-
-async function getTicketStock() {
-  const rows = await getRows(TICKET_SHEET, "A:K");
-  let stock = 0;
-
-  for (const row of rows.slice(1)) {
-    const status = String(row[9] || "").trim() || "有效";
-    if (status !== "有效") continue;
-
-    stock += n(row[4]); // E 入庫張數（期初也放這裡）
-    stock -= n(row[5]); // F 售出張數
-    stock -= n(row[6]); // G 發放張數
-  }
-
-  return stock;
-}
-
-function formatTicketStock(tickets) {
-  const value = Number(tickets || 0);
-  const sign = value < 0 ? "-" : "";
-  const abs = Math.abs(value);
-  const books = Math.floor(abs / 50);
-  const rest = abs % 50;
-  return `${sign}${books}本 + ${rest}張`;
-}
-
-async function appendTicketRecord(record, user) {
-  const sheets = getSheets();
-  const rows = await getRows(TICKET_SHEET, "A:A");
-  let nextRow = 2;
-
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i] && rows[i][0]) nextRow = i + 2;
-  }
-
-  const values = [[
-    record.date || taipeiDate(),       // A 日期
-    user?.id || "",                    // B 填表人ID
-    user?.name || "",                  // C 填表人
-    record.action || "",               // D 動作
-    record.inQty || 0,                 // E 入庫張數
-    record.soldQty || 0,               // F 售出張數
-    record.giveQty || 0,               // G 發放張數
-    record.income || 0,                // H 收入金額
-    record.note || "",                 // I 備註
-    "有效",                            // J 狀態
-    taipeiNow(),                       // K 建立時間
-  ]];
-
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: sheetRange(TICKET_SHEET, `A${nextRow}:K${nextRow}`),
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values },
-  });
-
-  return nextRow;
-}
-
 async function getCurrentBalance() {
   let initialCash = 0;
   try {
@@ -657,9 +597,6 @@ module.exports = {
   getCurrentStock,
   formatStock,
   getCurrentBalance,
-  getTicketStock,
-  formatTicketStock,
-  appendTicketRecord,
   getSafetyCash,
   getCashStatus,
   getStockStatus,

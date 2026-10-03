@@ -21,7 +21,6 @@ const {
 const { incomeTemplate, handleIncome } = require("./commands/income");
 const { expenseTemplate, handleExpense } = require("./commands/expense");
 const { paymentTemplate, handlePayment } = require("./commands/payment");
-const { ticketInTemplate, handleTicketStock, handleTicketIn } = require("./commands/ticket");
 const {
   handleToday,
   handleMonth,
@@ -92,23 +91,6 @@ async function replyMessages(replyToken, messages) {
 }
 
 async function notifyGroupSafely(kind, user, resultText, event) {
-  // V10.1：預設關閉「私訊記帳完成後主動 Push 群組」，
-  // 避免消耗 LINE 官方帳號每月免費 Push 訊息額度。
-  //
-  // 如果未來要重新開啟，可在 Render Environment 設定：
-  // PRIVATE_GROUP_NOTIFY_ENABLED=true
-  const privateGroupNotifyEnabled =
-    String(process.env.PRIVATE_GROUP_NOTIFY_ENABLED || "false")
-      .trim()
-      .toLowerCase() === "true";
-
-  if (!privateGroupNotifyEnabled) {
-    console.log(
-      "GROUP_NOTIFY_SKIPPED: PRIVATE_GROUP_NOTIFY_ENABLED is false"
-    );
-    return;
-  }
-
   try {
     if (event?.source?.type === "group") {
       console.log(
@@ -163,10 +145,6 @@ async function startMode(event, mode) {
     return replyText(event.replyToken, paymentTemplate());
   }
 
-  if (mode === "ticketIn") {
-    return replyText(event.replyToken, ticketInTemplate());
-  }
-
   clearSession(event);
 
   return replyText(
@@ -215,9 +193,6 @@ async function handleSessionInput(event, text, user) {
   } else if (session.mode === "payment") {
     resultText = await handlePayment(text, user);
     kind = "payment";
-  } else if (session.mode === "ticketIn") {
-    resultText = await handleTicketIn(text, user);
-    kind = "ticket";
   } else {
     clearSession(event);
     return false;
@@ -421,22 +396,6 @@ LINE_GROUP_ID=${event.source.groupId}`
         event.replyToken,
         result
       );
-    }
-
-    if (
-      text === "球券庫存" ||
-      text === "🎫 球券庫存"
-    ) {
-      clearSession(event);
-      const result = await handleTicketStock();
-      return replyText(event.replyToken, result);
-    }
-
-    if (
-      text === "球券入庫" ||
-      text === "📥 球券入庫"
-    ) {
-      return startMode(event, "ticketIn");
     }
 
     /*
