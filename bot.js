@@ -21,7 +21,6 @@ const {
 const { incomeTemplate, handleIncome } = require("./commands/income");
 const { expenseTemplate, handleExpense } = require("./commands/expense");
 const { paymentTemplate, handlePayment } = require("./commands/payment");
-const { ticketInTemplate, handleTicketStock, handleTicketIn } = require("./commands/ticket");
 const {
   handleToday,
   handleMonth,
@@ -163,10 +162,6 @@ async function startMode(event, mode) {
     return replyText(event.replyToken, paymentTemplate());
   }
 
-  if (mode === "ticketIn") {
-    return replyText(event.replyToken, ticketInTemplate());
-  }
-
   clearSession(event);
 
   return replyText(
@@ -215,9 +210,6 @@ async function handleSessionInput(event, text, user) {
   } else if (session.mode === "payment") {
     resultText = await handlePayment(text, user);
     kind = "payment";
-  } else if (session.mode === "ticketIn") {
-    resultText = await handleTicketIn(text, user);
-    kind = "ticket";
   } else {
     clearSession(event);
     return false;
@@ -421,22 +413,6 @@ LINE_GROUP_ID=${event.source.groupId}`
         event.replyToken,
         result
       );
-    }
-
-    if (
-      text === "球券庫存" ||
-      text === "🎫 球券庫存"
-    ) {
-      clearSession(event);
-      const result = await handleTicketStock();
-      return replyText(event.replyToken, result);
-    }
-
-    if (
-      text === "球券入庫" ||
-      text === "📥 球券入庫"
-    ) {
-      return startMode(event, "ticketIn");
     }
 
     /*
