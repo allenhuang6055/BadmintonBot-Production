@@ -1,4 +1,4 @@
-function quickReply(items) {
+﻿function quickReply(items) {
   return {
     items: items.map(([label, text]) => ({
       type: "action",
@@ -19,8 +19,10 @@ function mainMenuMessage() {
       ["📅 本月", "本月"],
       ["👤 我的未交", "我的未交"],
       ["🏸 球庫存", "球庫存"]
+      [🎫 球券库存, 球券库存],
     ])
   };
 }
 
 module.exports = { mainMenuMessage, quickReply };
+
