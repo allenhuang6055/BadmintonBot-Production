@@ -34,7 +34,6 @@ function sessionName(mode) {
   if (mode === "income") return "收入";
   if (mode === "expense") return "支出";
   if (mode === "payment") return "幹部交款";
-  if (mode === "ticketIn") return "球券入庫";
   return mode || "";
 }
 
