@@ -1,4 +1,4 @@
-﻿require("dotenv").config();
+require("dotenv").config();
 
 const express = require("express");
 const line = require("@line/bot-sdk");
@@ -21,13 +21,11 @@ const {
 const { incomeTemplate, handleIncome } = require("./commands/income");
 const { expenseTemplate, handleExpense } = require("./commands/expense");
 const { paymentTemplate, handlePayment } = require("./commands/payment");
-const { appendTicketIn } = require("./services/googleSheet");
 const {
   handleToday,
   handleMonth,
   handleMyUnpaid,
   handleStock,
-  handleTicketStock,
   handleRangeQuery,
 } = require("./commands/query");
 
@@ -164,13 +162,6 @@ async function startMode(event, mode) {
     return replyText(event.replyToken, paymentTemplate());
   }
 
-  if (mode === "ticketIn") {
-    return replyText(
-      event.replyToken,
-      "📥 球券入庫`n`n請輸入入庫張數："
-    );
-  }
-
   clearSession(event);
 
   return replyText(
@@ -219,25 +210,6 @@ async function handleSessionInput(event, text, user) {
   } else if (session.mode === "payment") {
     resultText = await handlePayment(text, user);
     kind = "payment";
-  } else if (session.mode === "ticketIn") {
-    const qty = Number(String(text).trim());
-
-    if (!Number.isInteger(qty) || qty <= 0) {
-      await replyText(
-        event.replyToken,
-        "⚠️ 請輸入正確的球券入庫張數，例如：500"
-      );
-      return true;
-    }
-
-    const stock = await appendTicketIn(qty, user);
-
-    resultText =
-      "✅ 球券入庫成功\n\n" +
-      "本次入庫：" + qty.toLocaleString("zh-TW") + " 張\n" +
-      "目前庫存：" + Number(stock || 0).toLocaleString("zh-TW") + " 張";
-
-    kind = "ticketIn";
   } else {
     clearSession(event);
     return false;
@@ -443,20 +415,6 @@ LINE_GROUP_ID=${event.source.groupId}`
       );
     }
 
-    if (
-      text === "球券庫存" ||
-      text === "球券"
-    ) {
-      clearSession(event);
-
-      const result = await handleTicketStock();
-
-      return replyText(
-        event.replyToken,
-        result
-      );
-    }
-
     /*
      * 明確模式指令：
      * 建立 Session，下一則訊息固定走指定流程。
@@ -569,8 +527,3 @@ app.listen(port, () => {
     `BadmintonBot V10 running on port ${port}`
   );
 });
-
-
-
-
-

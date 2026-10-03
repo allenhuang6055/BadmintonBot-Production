@@ -1,4 +1,4 @@
-﻿require("dotenv").config();
+require("dotenv").config();
 const { google } = require("googleapis");
 
 const DB_SHEET = "02_LINE資料庫";
@@ -585,59 +585,7 @@ function getStockStatus(balls) {
   return "🟢 庫存狀態：正常";
 }
 
-
-async function getTicketStock() {
-  const rows = await getRows("10_球券庫存", "A:K");
-
-  let stock = 0;
-
-  for (const row of rows.slice(1)) {
-    const action = String(row[3] || "").trim();
-    const stockIn = Number(String(row[4] || "0").replace(/,/g, "")) || 0;
-    const sold = Number(String(row[5] || "0").replace(/,/g, "")) || 0;
-    const issued = Number(String(row[6] || "0").replace(/,/g, "")) || 0;
-    const status = String(row[9] || "").trim() || "有效";
-
-    if (status !== "有效") continue;
-
-    if (action === "期初盤點") {
-      stock = stockIn;
-    } else {
-      stock += stockIn - sold - issued;
-    }
-  }
-
-  return stock;
-}
-
-async function appendTicketIn(qty, user) {
-  const n = Number(qty);
-
-  if (!Number.isFinite(n) || n <= 0) {
-    throw new Error("球券入庫張數必須大於 0");
-  }
-
-  const row = [
-    taipeiDate(),                           // A 日期
-    user?.name || user?.displayName || "", // B 操作者
-    n,                                      // C 進貨
-    "",                                     // D 領用
-    "",                                     // E 發放
-    "",                                     // F 作廢
-    "",                                     // G
-    "",                                     // H
-    "",                                     // I
-    "",                                     // J
-    "LINE球券入庫"                          // K 備註
-  ];
-
-  await writeRows("10_球券庫存", [row]);
-
-  return getTicketStock();
-}
 module.exports = {
-  appendTicketIn,
-  getTicketStock,
   getEnabledItems,
   appendRecords,
   getSummary,
@@ -653,6 +601,3 @@ module.exports = {
   getCashStatus,
   getStockStatus,
 };
-
-
-

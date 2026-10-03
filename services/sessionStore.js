@@ -1,4 +1,4 @@
-const sessions = new Map();
+﻿const sessions = new Map();
 const SESSION_TTL_MS = 5 * 60 * 1000;
 
 function getKey(event) {
@@ -34,6 +34,7 @@ function sessionName(mode) {
   if (mode === "income") return "收入";
   if (mode === "expense") return "支出";
   if (mode === "payment") return "幹部交款";
+  if (mode === "ticketIn") return "球券入庫";
   return mode || "";
 }
 
@@ -43,3 +44,4 @@ module.exports = {
   clearSession,
   sessionName,
 };
+
