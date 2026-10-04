@@ -712,13 +712,20 @@ async function appendTicketConsignment(staffName, qty, user, note = "") {
   let staffStock = 0;
 
   for (const row of rows) {
+    const action = String(row[3] || "").trim();
     const status = String(row[9] || "").trim();
 
-    if (status && status !== "有效") continue;
+    // 只計算有效的寄賣資料，忽略摘要列及其他資料
+    if (action !== "寄賣") continue;
+    if (status !== "有效") continue;
 
     const rowStaff = String(row[12] || "").trim();
-    const consignmentIn = Number(row[13] || 0);
-    const consignmentReturn = Number(row[14] || 0);
+
+    const rawIn = Number(String(row[13] || "0").replace(/,/g, ""));
+    const rawReturn = Number(String(row[14] || "0").replace(/,/g, ""));
+
+    const consignmentIn = Number.isFinite(rawIn) ? rawIn : 0;
+    const consignmentReturn = Number.isFinite(rawReturn) ? rawReturn : 0;
 
     // 全部幹部目前持有量
     consigned += consignmentIn;
@@ -769,7 +776,7 @@ async function appendTicketConsignment(staffName, qty, user, note = "") {
     staffStockAfter: staffStock + n,
     totalStock: stock,
     officeStockBefore: officeStock,
-    officeStockAfter: officeStock - n
+    officeStockAfter: Number(officeStock) - Number(n)
   };
 }
 async function appendTicketIn(qty, user, note = "") {
@@ -821,6 +828,8 @@ module.exports = {
   getCashStatus,
   getStockStatus,
 };
+
+
 
 
 
