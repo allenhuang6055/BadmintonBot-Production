@@ -681,6 +681,7 @@ async function appendTicketIn(qty, user) {
 }
 module.exports = {
   appendTicketIn,
+  appendTicketSale,
   getTicketStock,
   getEnabledItems,
   appendRecords,
@@ -697,6 +698,7 @@ module.exports = {
   getCashStatus,
   getStockStatus,
 };
+
 
 
 
