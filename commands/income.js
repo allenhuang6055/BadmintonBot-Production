@@ -70,11 +70,21 @@ const ticketIncome = Number(ticketKey ? parsed.result[ticketKey] : 0);
     result: parsed.result
   });
 
+  let ticketStockAfter = null;
+  let ticketSoldBooks = 0;
+  let ticketSoldQty = 0;
+
   if (ticketIncome > 0) {
     console.log("TICKET_SALE_START:", ticketIncome);
-    const ticketStockAfter = await appendTicketSale(ticketIncome, user);
+
+    ticketSoldBooks = ticketIncome / 800;
+    ticketSoldQty = ticketSoldBooks * 50;
+    ticketStockAfter = await appendTicketSale(ticketIncome, user);
+
     console.log("TICKET_SALE_DONE:", {
       income: ticketIncome,
+      soldBooks: ticketSoldBooks,
+      soldQty: ticketSoldQty,
       stockAfter: ticketStockAfter
     });
   }
@@ -100,6 +110,12 @@ ${incomeLines.join("\n")}
 ${incomeBlock}
 耗球：${money(ballsUsed)} 顆
 
+${ticketIncome > 0 ? `
+🎟️ 球券收入：${money(ticketIncome)} 元
+📕 本次售出：${ticketSoldBooks} 本
+🎫 本次扣除：${ticketSoldQty} 張
+📦 扣除後球券庫存：${ticketStockAfter} 張
+` : ""}
 🏸 剩餘庫存：${formatStock(stock)}
 💰 我的未交：${money(cumulativeUnpaid)} 元
 
@@ -111,6 +127,7 @@ module.exports = {
   incomeTemplate,
   handleIncome,
 };
+
 
 
 
