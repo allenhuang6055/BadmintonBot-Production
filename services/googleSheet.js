@@ -610,6 +610,48 @@ async function getTicketStock() {
   return stock;
 }
 
+async function appendTicketSale(amount, user) {
+  const money = Number(amount);
+
+  if (!Number.isFinite(money) || money <= 0) {
+    throw new Error("球券收入金額必須大於 0");
+  }
+
+  if (money % 800 !== 0) {
+    throw new Error("球券收入金額必須為 800 的倍數");
+  }
+
+  const books = money / 800;
+  const soldQty = books * 50;
+
+  const stock = await getTicketStock();
+
+  if (stock < soldQty) {
+    throw new Error(
+      `球券庫存不足，目前 ${stock} 張，本次需要 ${soldQty} 張`
+    );
+  }
+
+  const now = taipeiNow();
+
+  const row = [
+    taipeiDate(),                         // A 日期
+    user?.id || user?.userId || "",       // B 填表人id
+    user?.name || user?.displayName || "",// C 填表人
+    "售出",                               // D 動作
+    "",                                   // E 入庫張數
+    soldQty,                              // F 售出張數
+    "",                                   // G 發放張數
+    money,                                // H 收入金額
+    "LINE收入球券",                       // I 備註
+    "有效",                               // J 狀態
+    now                                   // K 建立時間
+  ];
+
+  await writeRows("10_球券庫存", [row]);
+
+  return getTicketStock();
+}
 async function appendTicketIn(qty, user) {
   const n = Number(qty);
 
@@ -655,6 +697,7 @@ module.exports = {
   getCashStatus,
   getStockStatus,
 };
+
 
 
 

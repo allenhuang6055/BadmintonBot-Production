@@ -1,10 +1,11 @@
-const {
+﻿const {
   getEnabledItems,
   appendRecords,
   getSummary,
   getCumulativeUnpaid,
   getCurrentStock,
   formatStock,
+  appendTicketSale,
 } = require("../services/googleSheet");
 const { parseNote, parseByFuzzyLines } = require("../services/parser");
 const { parseRecordDate } = require("../services/dateParser");
@@ -60,6 +61,13 @@ async function handleIncome(text, user) {
 
   if (!records.length) throw new Error("沒有讀到收入金額或耗球數。");
 
+  // 球券收入：金額換算成售出張數，並同步扣除球券庫存
+  const ticketIncome = Number(parsed.result["球券"] || 0);
+
+  if (ticketIncome > 0) {
+    await appendTicketSale(ticketIncome, user);
+  }
+
   await appendRecords(records, user);
 
   const incomeTotal = records.reduce((sum, r) => sum + (r.income || 0), 0);
@@ -92,3 +100,5 @@ module.exports = {
   incomeTemplate,
   handleIncome,
 };
+
+
