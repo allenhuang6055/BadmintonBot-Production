@@ -652,6 +652,45 @@ async function appendTicketSale(amount, user) {
 
   return getTicketStock();
 }
+async function appendTicketOut(qty, user) {
+  const n = Number(qty);
+
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
+    throw new Error("球券發放張數必須大於 0");
+  }
+
+  const beforeStock = await getTicketStock();
+
+  if (beforeStock < n) {
+    throw new Error(`球券庫存不足，目前 ${beforeStock} 張，本次要發放 ${n} 張`);
+  }
+
+  const now = taipeiNow();
+
+  const row = [
+    taipeiDate(),                          // A 日期
+    user?.userId || user?.id || "",        // B 填表人id
+    user?.name || user?.displayName || "", // C 填表人
+    "發放",                                // D 動作
+    "",                                    // E 入庫張數
+    "",                                    // F 售出張數
+    n,                                     // G 發放張數
+    "",                                    // H 收入金額
+    "工作發放球券",                        // I 備註
+    "有效",                                // J 狀態
+    now                                    // K 建立時間
+  ];
+
+  await writeRows("10_球券庫存", [row]);
+
+  const afterStock = await getTicketStock();
+
+  return {
+    beforeStock,
+    afterStock,
+    qty: n
+  };
+}
 async function appendTicketIn(qty, user) {
   const n = Number(qty);
 
@@ -681,6 +720,7 @@ async function appendTicketIn(qty, user) {
 }
 module.exports = {
   appendTicketIn,
+  appendTicketOut,
   appendTicketSale,
   getTicketStock,
   getEnabledItems,
@@ -698,6 +738,8 @@ module.exports = {
   getCashStatus,
   getStockStatus,
 };
+
+
 
 
 

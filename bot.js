@@ -21,7 +21,7 @@ const {
 const { incomeTemplate, handleIncome } = require("./commands/income");
 const { expenseTemplate, handleExpense } = require("./commands/expense");
 const { paymentTemplate, handlePayment } = require("./commands/payment");
-const { appendTicketIn } = require("./services/googleSheet");
+const { appendTicketIn, appendTicketOut } = require("./services/googleSheet");
 const {
   handleToday,
   handleMonth,
@@ -171,6 +171,13 @@ async function startMode(event, mode) {
     );
   }
 
+  if (mode === "ticketOut") {
+    return replyText(
+      event.replyToken,
+      "🎟️ 發放球券\n請輸入發放張數。"
+    );
+  }
+
   clearSession(event);
 
   return replyText(
@@ -238,6 +245,26 @@ async function handleSessionInput(event, text, user) {
       "目前庫存：" + Number(stock || 0).toLocaleString("zh-TW") + " 張";
 
     kind = "ticketIn";
+  } else if (session.mode === "ticketOut") {
+    const qty = Number(String(text).trim());
+
+    if (!Number.isInteger(qty) || qty <= 0) {
+      await replyText(
+        event.replyToken,
+        "⚠️ 請輸入正確的發放張數，例如：50"
+      );
+      return true;
+    }
+
+    const ticketResult = await appendTicketOut(qty, user);
+
+    resultText =
+      "✅ 球券發放成功\n\n" +
+      "本次發放：" + qty.toLocaleString("zh-TW") + " 張\n" +
+      "發放前庫存：" + Number(ticketResult.beforeStock || 0).toLocaleString("zh-TW") + " 張\n" +
+      "發放後庫存：" + Number(ticketResult.afterStock || 0).toLocaleString("zh-TW") + " 張";
+
+    kind = "ticketOut";
   } else {
     clearSession(event);
     return false;
@@ -469,6 +496,15 @@ LINE_GROUP_ID=${event.source.groupId}`
     return startMode(event, "ticketIn");
   }
 
+  // 🎟️ 發放球券
+  if (
+    text === "發放球券" ||
+    text === "🎟️ 發放球券"
+  ) {
+    clearSession(event);
+    return startMode(event, "ticketOut");
+  }
+
     if (
       text === "收入" ||
       text === "💰 收入" ||
@@ -577,6 +613,9 @@ app.listen(port, () => {
     `BadmintonBot V10 running on port ${port}`
   );
 });
+
+
+
 
 
 
