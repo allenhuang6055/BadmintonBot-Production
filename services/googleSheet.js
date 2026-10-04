@@ -692,6 +692,59 @@ async function appendTicketOut(qty, user, note = "") {
     qty: n
   };
 }
+async function getTicketConsignmentStock() {
+  const totalStock = await getTicketStock();
+  const rows = await getRows("10_球券庫存", "A:O");
+
+  const staffMap = {};
+
+  for (const row of rows) {
+    const action = String(row[3] || "").trim();
+    const status = String(row[9] || "").trim();
+
+    // 只計算有效的寄賣紀錄
+    if (action !== "寄賣") continue;
+    if (status !== "有效") continue;
+
+    const staff = String(row[12] || "").trim();
+    if (!staff) continue;
+
+    const rawIn = Number(String(row[13] || "0").replace(/,/g, ""));
+    const rawReturn = Number(String(row[14] || "0").replace(/,/g, ""));
+
+    const qtyIn = Number.isFinite(rawIn) ? rawIn : 0;
+    const qtyReturn = Number.isFinite(rawReturn) ? rawReturn : 0;
+
+    if (!staffMap[staff]) {
+      staffMap[staff] = 0;
+    }
+
+    staffMap[staff] += qtyIn;
+    staffMap[staff] -= qtyReturn;
+  }
+
+  const staffStocks = Object.entries(staffMap)
+    .filter(([, qty]) => qty > 0)
+    .map(([staff, qty]) => ({
+      staff,
+      qty
+    }))
+    .sort((a, b) => b.qty - a.qty);
+
+  const consignedTotal = staffStocks.reduce(
+    (sum, item) => sum + item.qty,
+    0
+  );
+
+  const officeStock = totalStock - consignedTotal;
+
+  return {
+    totalStock,
+    consignedTotal,
+    officeStock,
+    staffStocks
+  };
+}
 async function appendTicketConsignment(staffName, qty, user, note = "") {
   const n = Number(qty);
   const staff = String(staffName || "").trim();
@@ -811,6 +864,7 @@ module.exports = {
   appendTicketIn,
   appendTicketOut,
   appendTicketConsignment,
+  getTicketConsignmentStock,
   appendTicketSale,
   getTicketStock,
   getEnabledItems,
@@ -828,6 +882,8 @@ module.exports = {
   getCashStatus,
   getStockStatus,
 };
+
+
 
 
 

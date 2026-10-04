@@ -21,7 +21,7 @@ const {
 const { incomeTemplate, handleIncome } = require("./commands/income");
 const { expenseTemplate, handleExpense } = require("./commands/expense");
 const { paymentTemplate, handlePayment } = require("./commands/payment");
-const { appendTicketIn, appendTicketOut, appendTicketConsignment } = require("./services/googleSheet");
+const { appendTicketIn, appendTicketOut, appendTicketConsignment, getTicketConsignmentStock } = require("./services/googleSheet");
 const {
   handleToday,
   handleMonth,
@@ -573,6 +573,7 @@ LINE_GROUP_ID=${event.source.groupId}`
               ["📥 球券入庫", "球券入庫"],
               ["🎟️ 發放球券", "發放球券"],
               ["📦 幹部寄賣", "幹部寄賣"],
+              ["📋 寄賣庫存", "寄賣庫存"],
               ["🎫 球券庫存", "球券庫存"],
             ]),
           },
@@ -601,6 +602,54 @@ LINE_GROUP_ID=${event.source.groupId}`
     return startMode(event, "ticketConsignment");
   }
 
+  // 📋 寄賣庫存
+  if (
+    text === "寄賣庫存" ||
+    text === "📋 寄賣庫存"
+  ) {
+    clearSession(event);
+
+    const result = await getTicketConsignmentStock();
+
+    const formatBooks = (qty) => {
+      const n = Number(qty || 0);
+      const books = Math.floor(n / 50);
+      const rest = n % 50;
+
+      if (books > 0 && rest > 0) {
+        return `${books} 本 ${rest} 張／${n.toLocaleString("zh-TW")} 張`;
+      }
+
+      if (books > 0) {
+        return `${books} 本／${n.toLocaleString("zh-TW")} 張`;
+      }
+
+      return `${n.toLocaleString("zh-TW")} 張`;
+    };
+
+    let message = "📋 幹部寄賣庫存\n\n";
+
+    if (result.staffStocks.length === 0) {
+      message += "目前沒有幹部持有寄賣球券\n";
+    } else {
+      for (const item of result.staffStocks) {
+        message += `${item.staff}：${formatBooks(item.qty)}\n`;
+      }
+    }
+
+    message +=
+      "\n幹部寄賣合計：" +
+      Number(result.consignedTotal || 0).toLocaleString("zh-TW") +
+      " 張\n" +
+      "財務持有：" +
+      Number(result.officeStock || 0).toLocaleString("zh-TW") +
+      " 張\n" +
+      "球券總庫存：" +
+      Number(result.totalStock || 0).toLocaleString("zh-TW") +
+      " 張";
+
+    return replyText(event.replyToken, message);
+  }
   // 🎟️ 發放球券
   if (
     text === "發放球券" ||
@@ -718,6 +767,9 @@ app.listen(port, () => {
     `BadmintonBot V10 running on port ${port}`
   );
 });
+
+
+
 
 
 
