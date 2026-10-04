@@ -21,7 +21,7 @@ const {
 const { incomeTemplate, handleIncome } = require("./commands/income");
 const { expenseTemplate, handleExpense } = require("./commands/expense");
 const { paymentTemplate, handlePayment } = require("./commands/payment");
-const { appendTicketIn, appendTicketOut } = require("./services/googleSheet");
+const { appendTicketIn, appendTicketOut, appendTicketConsignment } = require("./services/googleSheet");
 const {
   handleToday,
   handleMonth,
@@ -271,6 +271,65 @@ async function handleSessionInput(event, text, user) {
       "發放後庫存：" + Number(ticketResult.afterStock || 0).toLocaleString("zh-TW") + " 張";
 
     kind = "ticketOut";
+    } else if (session.mode === "ticketConsignment") {
+      const parts = String(text).trim().split(/\s+/);
+
+      if (parts.length < 2) {
+        await replyText(
+          event.replyToken,
+          "📦 幹部寄賣\n\n請輸入：幹部姓名 張數 備註\n例如：阿明 250 十月寄賣"
+        );
+        return true;
+      }
+
+      const staffName = parts.shift();
+      const qty = Number(parts.shift());
+      const note = parts.join(" ").trim();
+
+      if (!Number.isInteger(qty) || qty <= 0) {
+        await replyText(
+          event.replyToken,
+          "⚠️ 寄賣張數請輸入正整數\n例如：阿明 250 十月寄賣"
+        );
+        return true;
+      }
+
+      const result = await appendTicketConsignment(
+        staffName,
+        qty,
+        user,
+        note
+      );
+
+      const formatBooks = (n) => {
+        const books = Math.floor(n / 50);
+        const rest = n % 50;
+
+        if (books > 0 && rest > 0) {
+          return `${books} 本＋${rest} 張`;
+        }
+
+        if (books > 0) {
+          return `${books} 本／${n} 張`;
+        }
+
+        return `${n} 張`;
+      };
+
+      resultText =
+        "✅ 幹部寄賣完成\n\n" +
+        "幹部：" + result.staff + "\n" +
+        "本次領取：" + formatBooks(result.qty) + "\n" +
+        result.staff + "原持有：" +
+        result.staffStockBefore.toLocaleString("zh-TW") + " 張\n" +
+        result.staff + "目前持有：" +
+        result.staffStockAfter.toLocaleString("zh-TW") + " 張\n\n" +
+        "球券總庫存：" +
+        result.totalStock.toLocaleString("zh-TW") + " 張（不變）\n" +
+        "財務持有：" +
+        result.officeStockAfter.toLocaleString("zh-TW") + " 張";
+
+      kind = "ticketConsignment";
   } else {
     clearSession(event);
     return false;
@@ -506,6 +565,7 @@ LINE_GROUP_ID=${event.source.groupId}`
             quickReply: quickReply([
               ["📥 球券入庫", "球券入庫"],
               ["🎟️ 發放球券", "發放球券"],
+              ["📦 幹部寄賣", "幹部寄賣"],
               ["🎫 球券庫存", "球券庫存"],
             ]),
           },
@@ -523,6 +583,15 @@ LINE_GROUP_ID=${event.source.groupId}`
   ) {
     clearSession(event);
     return startMode(event, "ticketIn");
+  }
+
+  // 📦 幹部寄賣
+  if (
+    text === "幹部寄賣" ||
+    text === "📦 幹部寄賣"
+  ) {
+    clearSession(event);
+    return startMode(event, "ticketConsignment");
   }
 
   // 🎟️ 發放球券
@@ -642,6 +711,8 @@ app.listen(port, () => {
     `BadmintonBot V10 running on port ${port}`
   );
 });
+
+
 
 
 

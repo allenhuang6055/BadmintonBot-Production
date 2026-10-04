@@ -692,6 +692,86 @@ async function appendTicketOut(qty, user, note = "") {
     qty: n
   };
 }
+async function appendTicketConsignment(staffName, qty, user, note = "") {
+  const n = Number(qty);
+  const staff = String(staffName || "").trim();
+
+  if (!staff) {
+    throw new Error("請輸入寄賣幹部");
+  }
+
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
+    throw new Error("寄賣張數必須為大於 0 的整數");
+  }
+
+  const stock = await getTicketStock();
+
+  // 計算目前已寄放在幹部手上的球券
+  const rows = await getRows("10_球券庫存", "A:O");
+  let consigned = 0;
+  let staffStock = 0;
+
+  for (const row of rows) {
+    const status = String(row[9] || "").trim();
+
+    if (status && status !== "有效") continue;
+
+    const rowStaff = String(row[12] || "").trim();
+    const consignmentIn = Number(row[13] || 0);
+    const consignmentReturn = Number(row[14] || 0);
+
+    // 全部幹部目前持有量
+    consigned += consignmentIn;
+    consigned -= consignmentReturn;
+
+    // 本次指定幹部目前持有量
+    if (rowStaff === staff) {
+      staffStock += consignmentIn;
+      staffStock -= consignmentReturn;
+    }
+  }
+
+  const officeStock = stock - consigned;
+
+  if (officeStock < n) {
+    throw new Error(
+      `財務手上球券不足，目前可寄賣 ${officeStock} 張，本次要寄賣 ${n} 張`
+    );
+  }
+
+  const now = taipeiNow();
+
+  const row = [
+    taipeiDate(),                          // A 日期
+    user?.userId || user?.id || "",        // B 填表人id
+    user?.name || user?.displayName || "", // C 填表人
+    "寄賣",                                // D 動作
+    "",                                    // E 入庫
+    "",                                    // F 售出
+    "",                                    // G 發放
+    "",                                    // H 收入
+    "幹部寄賣球券",                        // I 備註
+    "有效",                                // J 狀態
+    now,                                   // K 建立時間
+    note,                                  // L 備註
+    staff,                                 // M 寄賣幹部
+    n,                                     // N 寄賣領取張數
+    ""                                     // O 寄賣退回張數
+  ];
+
+  await writeRows("10_球券庫存", [row]);
+
+  return {
+    staff,
+    qty: n,
+    books: n / 50,
+    staffStockBefore: staffStock,
+    staffStockAfter: staffStock + n,
+    totalStock: stock,
+    officeStockBefore: officeStock,
+    officeStockAfter: officeStock - n
+  };
+}
 async function appendTicketIn(qty, user, note = "") {
   const n = Number(qty);
 
@@ -740,6 +820,9 @@ module.exports = {
   getCashStatus,
   getStockStatus,
 };
+
+
+
 
 
 
