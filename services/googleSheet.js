@@ -621,13 +621,13 @@ async function appendTicketIn(qty, user) {
 
   const row = [
     taipeiDate(),                         // A 日期
-    user?.userId || "",                   // B 填表人id
+    user?.userId || user?.id || "",       // B 填表人id
     user?.name || user?.displayName || "",// C 填表人
     "入庫",                               // D 動作
     n,                                    // E 入庫張數
-    0,                                    // F 售出張數
-    0,                                    // G 發放張數
-    0,                                    // H 收入金額
+    "",                                   // F 售出張數
+    "",                                   // G 發放張數
+    "",                                   // H 收入金額
     "LINE球券入庫",                       // I 備註
     "有效",                               // J 狀態
     now                                   // K 建立時間
@@ -655,6 +655,7 @@ module.exports = {
   getCashStatus,
   getStockStatus,
 };
+
 
 
 
