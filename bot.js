@@ -178,6 +178,13 @@ async function startMode(event, mode) {
     );
   }
 
+  if (mode === "ticketConsignment") {
+    return replyText(
+      event.replyToken,
+      "📦 幹部寄賣\n\n請輸入：幹部姓名 張數 備註\n例如：阿明 250 十月寄賣"
+    );
+  }
+
   clearSession(event);
 
   return replyText(
