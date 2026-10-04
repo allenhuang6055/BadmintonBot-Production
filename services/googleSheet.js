@@ -610,6 +610,86 @@ async function getTicketStock() {
   return stock;
 }
 
+async function appendConsignmentTicketSale(staffName, amount, user) {
+  const staff = String(staffName || "").trim();
+  const money = Number(amount);
+
+  if (!staff) {
+    throw new Error("找不到要扣除寄賣庫存的幹部");
+  }
+
+  if (!Number.isFinite(money) || money <= 0) {
+    throw new Error("球券收入金額必須大於 0");
+  }
+
+  if (money % 800 !== 0) {
+    throw new Error("球券收入金額必須為 800 的倍數");
+  }
+
+  const books = money / 800;
+  const soldQty = books * 50;
+
+  const rows = await getRows("10_球券庫存", "A:O");
+
+  let staffStock = 0;
+
+  for (const row of rows) {
+    const action = String(row[3] || "").trim();
+    const status = String(row[9] || "").trim();
+    const rowStaff = String(row[12] || "").trim();
+
+    if (action !== "寄賣") continue;
+    if (status !== "有效") continue;
+    if (rowStaff !== staff) continue;
+
+    const rawIn = Number(String(row[13] || "0").replace(/,/g, ""));
+    const rawReturn = Number(String(row[14] || "0").replace(/,/g, ""));
+
+    const qtyIn = Number.isFinite(rawIn) ? rawIn : 0;
+    const qtyReturn = Number.isFinite(rawReturn) ? rawReturn : 0;
+
+    staffStock += qtyIn;
+    staffStock -= qtyReturn;
+  }
+
+  if (staffStock < soldQty) {
+    throw new Error(
+      `${staff}寄賣球券不足，目前 ${staffStock} 張，本次需要扣 ${soldQty} 張`
+    );
+  }
+
+  const now = taipeiNow();
+
+  const row = [
+    taipeiDate(),                          // A 日期
+    user?.id || user?.userId || "",        // B 填表人id
+    user?.name || user?.displayName || "", // C 填表人
+    "寄賣",                                // D 動作
+    "",                                    // E 入庫
+    soldQty,                               // F 售出張數（總庫存減少）
+    "",                                    // G 發放
+    money,                                 // H 收入金額
+    "寄賣球券售出",                        // I 備註
+    "有效",                                // J 狀態
+    now,                                   // K 建立時間
+    `扣${staff}庫存`,                      // L 備註
+    staff,                                 // M 寄賣幹部
+    "",                                    // N 寄賣領取
+    soldQty                                // O 寄賣減少
+  ];
+
+  await writeRows("10_球券庫存", [row]);
+
+  const totalStockAfter = await getTicketStock();
+
+  return {
+    staff,
+    soldQty,
+    staffStockBefore: staffStock,
+    staffStockAfter: staffStock - soldQty,
+    totalStockAfter
+  };
+}
 async function appendTicketSale(amount, user) {
   const money = Number(amount);
 
@@ -864,6 +944,7 @@ module.exports = {
   appendTicketIn,
   appendTicketOut,
   appendTicketConsignment,
+  appendConsignmentTicketSale,
   getTicketConsignmentStock,
   appendTicketSale,
   getTicketStock,
@@ -882,6 +963,8 @@ module.exports = {
   getCashStatus,
   getStockStatus,
 };
+
+
 
 
 

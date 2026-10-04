@@ -6,6 +6,7 @@
   getCurrentStock,
   formatStock,
   appendTicketSale,
+  appendConsignmentTicketSale,
 } = require("../services/googleSheet");
 const { parseNote, parseByFuzzyLines } = require("../services/parser");
 const { parseRecordDate } = require("../services/dateParser");
@@ -79,16 +80,48 @@ const ticketIncome = Number(ticketKey ? parsed.result[ticketKey] : 0);
 
     ticketSoldBooks = ticketIncome / 800;
     ticketSoldQty = ticketSoldBooks * 50;
-    ticketStockAfter = await appendTicketSale(ticketIncome, user);
 
-    console.log("TICKET_SALE_DONE:", {
-      income: ticketIncome,
-      soldBooks: ticketSoldBooks,
-      soldQty: ticketSoldQty,
-      stockAfter: ticketStockAfter
-    });
+    // 備註格式：扣詩特庫存、扣阿明庫存...
+    const consignmentMatch = String(note || "")
+      .trim()
+      .match(/^扣(.+?)庫存$/);
+
+    if (consignmentMatch) {
+      const staffName = consignmentMatch[1].trim();
+
+      const consignmentResult = await appendConsignmentTicketSale(
+        staffName,
+        ticketIncome,
+        user
+      );
+
+      ticketStockAfter = consignmentResult.totalStockAfter;
+
+      console.log("CONSIGNMENT_TICKET_SALE_DONE:", {
+        staff: staffName,
+        income: ticketIncome,
+        soldBooks: ticketSoldBooks,
+        soldQty: ticketSoldQty,
+        staffStockBefore: consignmentResult.staffStockBefore,
+        staffStockAfter: consignmentResult.staffStockAfter,
+        totalStockAfter: consignmentResult.totalStockAfter
+      });
+
+    } else {
+
+      ticketStockAfter = await appendTicketSale(
+        ticketIncome,
+        user
+      );
+
+      console.log("TICKET_SALE_DONE:", {
+        income: ticketIncome,
+        soldBooks: ticketSoldBooks,
+        soldQty: ticketSoldQty,
+        stockAfter: ticketStockAfter
+      });
+    }
   }
-
   await appendRecords(records, user);
 
   const incomeTotal = records.reduce((sum, r) => sum + (r.income || 0), 0);
@@ -127,6 +160,8 @@ module.exports = {
   incomeTemplate,
   handleIncome,
 };
+
+
 
 
 
