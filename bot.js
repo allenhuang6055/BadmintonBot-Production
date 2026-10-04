@@ -3,7 +3,7 @@
 const express = require("express");
 const line = require("@line/bot-sdk");
 
-const { mainMenuMessage } = require("./config/menu");
+const { mainMenuMessage, quickReply } = require("./config/menu");
 const { getUser } = require("./services/lineUser");
 const {
   pushGroupMessage,
@@ -642,6 +642,7 @@ app.listen(port, () => {
     `BadmintonBot V10 running on port ${port}`
   );
 });
+
 
 
 
