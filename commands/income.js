@@ -62,7 +62,7 @@ async function handleIncome(text, user) {
   if (!records.length) throw new Error("沒有讀到收入金額或耗球數。");
 
   // 球券收入：金額換算成售出張數，並同步扣除球券庫存
-  const ticketIncome = Number(parsed.result["球券"] || 0);
+  const ticketIncome = Number(parsed.result["球券 (800元/本)"] || 0);
   console.log("TICKET_DEBUG:", {
     ticketRaw: parsed.result["球券"],
     ticketIncome: ticketIncome,
@@ -110,6 +110,7 @@ module.exports = {
   incomeTemplate,
   handleIncome,
 };
+
 
 
 
