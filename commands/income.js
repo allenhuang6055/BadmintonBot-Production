@@ -63,6 +63,11 @@ async function handleIncome(text, user) {
 
   // 球券收入：金額換算成售出張數，並同步扣除球券庫存
   const ticketIncome = Number(parsed.result["球券"] || 0);
+  console.log("TICKET_DEBUG:", {
+    ticketRaw: parsed.result["球券"],
+    ticketIncome: ticketIncome,
+    result: parsed.result
+  });
 
   if (ticketIncome > 0) {
     console.log("TICKET_SALE_START:", ticketIncome);
@@ -105,6 +110,7 @@ module.exports = {
   incomeTemplate,
   handleIncome,
 };
+
 
 
 
