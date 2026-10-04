@@ -652,7 +652,7 @@ async function appendTicketSale(amount, user) {
 
   return getTicketStock();
 }
-async function appendTicketOut(qty, user) {
+async function appendTicketOut(qty, user, note = "") {
   const n = Number(qty);
 
   if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
@@ -678,7 +678,8 @@ async function appendTicketOut(qty, user) {
     "",                                    // H 收入金額
     "工作發放球券",                        // I 備註
     "有效",                                // J 狀態
-    now                                    // K 建立時間
+    now,                                    // K 建立時間
+    note                         // L 備註
   ];
 
   await writeRows("10_球券庫存", [row]);
@@ -691,7 +692,7 @@ async function appendTicketOut(qty, user) {
     qty: n
   };
 }
-async function appendTicketIn(qty, user) {
+async function appendTicketIn(qty, user, note = "") {
   const n = Number(qty);
 
   if (!Number.isFinite(n) || n <= 0) {
@@ -711,7 +712,8 @@ async function appendTicketIn(qty, user) {
     "",                                   // H 收入金額
     "LINE球券入庫",                       // I 備註
     "有效",                               // J 狀態
-    now                                   // K 建立時間
+    now,                                   // K 建立時間
+    note                         // L 備註
   ];
 
   await writeRows("10_球券庫存", [row]);
@@ -738,6 +740,12 @@ module.exports = {
   getCashStatus,
   getStockStatus,
 };
+
+
+
+
+
+
 
 
 

@@ -227,7 +227,10 @@ async function handleSessionInput(event, text, user) {
     resultText = await handlePayment(text, user);
     kind = "payment";
   } else if (session.mode === "ticketIn") {
-    const qty = Number(String(text).trim());
+    const ticketInput = String(text).trim();
+    const ticketParts = ticketInput.split(/\s+/);
+    const qty = Number(ticketParts.shift());
+    const note = ticketParts.join(" ").trim();
 
     if (!Number.isInteger(qty) || qty <= 0) {
       await replyText(
@@ -237,7 +240,7 @@ async function handleSessionInput(event, text, user) {
       return true;
     }
 
-    const stock = await appendTicketIn(qty, user);
+    const stock = await appendTicketIn(qty, user, note);
 
     resultText =
       "✅ 球券入庫成功\n\n" +
@@ -246,7 +249,10 @@ async function handleSessionInput(event, text, user) {
 
     kind = "ticketIn";
   } else if (session.mode === "ticketOut") {
-    const qty = Number(String(text).trim());
+    const ticketInput = String(text).trim();
+    const ticketParts = ticketInput.split(/\s+/);
+    const qty = Number(ticketParts.shift());
+    const note = ticketParts.join(" ").trim();
 
     if (!Number.isInteger(qty) || qty <= 0) {
       await replyText(
@@ -256,7 +262,7 @@ async function handleSessionInput(event, text, user) {
       return true;
     }
 
-    const ticketResult = await appendTicketOut(qty, user);
+    const ticketResult = await appendTicketOut(qty, user, note);
 
     resultText =
       "✅ 球券發放成功\n\n" +
@@ -484,6 +490,29 @@ LINE_GROUP_ID=${event.source.groupId}`
       );
     }
 
+    // 🎫 球券管理
+    if (
+      text === "球券管理" ||
+      text === "🎫 球券管理"
+    ) {
+      clearSession(event);
+
+      return replyMessages(
+        event.replyToken,
+        [
+          {
+            type: "text",
+            text: "🎫 球券管理\n請選擇操作：",
+            quickReply: quickReply([
+              ["📥 球券入庫", "球券入庫"],
+              ["🎟️ 發放球券", "發放球券"],
+              ["🎫 球券庫存", "球券庫存"],
+            ]),
+          },
+        ]
+      );
+    }
+
     /*
      * 明確模式指令：
      * 建立 Session，下一則訊息固定走指定流程。
@@ -613,6 +642,7 @@ app.listen(port, () => {
     `BadmintonBot V10 running on port ${port}`
   );
 });
+
 
 
 
