@@ -65,7 +65,12 @@ async function handleIncome(text, user) {
   const ticketIncome = Number(parsed.result["球券"] || 0);
 
   if (ticketIncome > 0) {
-    await appendTicketSale(ticketIncome, user);
+    console.log("TICKET_SALE_START:", ticketIncome);
+    const ticketStockAfter = await appendTicketSale(ticketIncome, user);
+    console.log("TICKET_SALE_DONE:", {
+      income: ticketIncome,
+      stockAfter: ticketStockAfter
+    });
   }
 
   await appendRecords(records, user);
@@ -100,5 +105,6 @@ module.exports = {
   incomeTemplate,
   handleIncome,
 };
+
 
 
